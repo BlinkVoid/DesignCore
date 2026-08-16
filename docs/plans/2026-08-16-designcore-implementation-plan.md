@@ -4,9 +4,9 @@
 
 **Goal:** Build DesignCore v1 — a Python package plus three agent skills that produce verified draw.io / Mermaid / Excalidraw diagrams for documentation, where the model never places coordinates and no diagram is complete until it has rendered.
 
-**Architecture:** A `.spec.yaml` graph spec (nodes, edges, groups — no geometry) is the source of truth. Adapters compile it to Mermaid text, mxGraph XML (via the official `@drawio/mcp` Mermaid→XML conversion), or Excalidraw JSON (positions from Graphviz). Every compile is followed by render → deterministic lint → bounded model vision check. Three purpose-named skills (`architecture-diagram`, `flow-diagram`, `concept-sketch`) carry the judgment layer on top.
+**Architecture:** A `.spec.yaml` graph spec (nodes, edges, groups — no geometry) is the source of truth. Adapters compile it to Mermaid text, mxGraph XML (owned emitter, positions from Graphviz), or Excalidraw JSON (positions from Graphviz). Every compile is followed by render → deterministic lint → bounded model vision check. Three purpose-named skills (`architecture-diagram`, `flow-diagram`, `concept-sketch`) carry the judgment layer on top.
 
-**Tech Stack:** Python 3.11+, uv, pytest, PyYAML, argparse. External binaries: `mmdc` (mermaid-cli), `dot` (Graphviz), `drawio` (snap CLI), Node for `@drawio/mcp`.
+**Tech Stack:** Python 3.11+, uv, pytest, PyYAML, argparse. External binaries: `mmdc` (mermaid-cli), `dot` (Graphviz), `drawio` (snap CLI), Node for the Excalidraw SVG export helper.
 
 **Spec:** `docs/plans/2026-08-16-designcore-design.md` — read it before starting. This plan implements it; the spec holds the rationale.
 
@@ -56,12 +56,36 @@ following amendments are **binding** and supersede the named task steps below.
   headless Chrome (`google-chrome --headless=new --screenshot`) rasterizing that SVG. Missing
   node_modules or Chrome → `BackendMissing` with the exact install command. The lint-only
   fallback module in Task 11 Step 4 is NOT used.
+
+  The `/tmp` guard stands. Task 11 Step 1's tests are amended accordingly: the BackendMissing
+  test is unchanged (the backend check precedes the path guard); the success-path test
+  (`test_drawio_renders_svg_and_png`) and the RenderError test must NOT use pytest's
+  `tmp_path` (which lives under `/tmp`); they create scratch dirs under
+  `Path.home() / '.cache' / 'designcore-tests'` with unique names and clean up afterwards.
+  Add two new tests: (i) a source path under `/tmp` raises `RenderError` mentioning snap
+  confinement; (ii) with `DISPLAY` removed from the environment, the issued command is
+  prefixed `xvfb-run -a` (assert via the injected fake `run` capturing its `cmd`).
+
+  A3 also amends Task 1's shipped `doctor.py`: the `node` backend's purpose string becomes
+  'Run the Excalidraw SVG export helper (jsdom + @excalidraw/utils)'. Task 11 makes that
+  one-line edit; no doctor test asserts on purpose strings, so nothing else changes.
 - **A4 (amends Task 13):** `Deps` gains
   `layout_groups: Callable[[DiagramSpec], dict[str, Placement]]`; the drawio branch of
   `_source_text` calls `emit_drawio(spec, deps.layout(spec), deps.layout_groups(spec))`.
   Pipeline tests' fake deps supply both (groups may return `{}`).
+
+  `Deps` LOSES the `convert` field entirely: delete `convert: Callable[[str], str]` from the
+  dataclass, `convert=mcp_converter()` from `Deps.default()`, and `mcp_converter` from the
+  pipeline's imports (`from designcore.emit.drawio import emit_drawio` only). The Task 13
+  Step 1 test fakes drop the `convert=lambda ...` kwargs. Nothing named `mcp_converter` or
+  `Converter` survives anywhere in the package.
 - **A5:** Task 10 Step 5 and Task 11 Step 6 verification paths move from `/tmp/dc-probe` to
   `~/dc-probe` (snap confinement).
+- **A6 (amends Task 15):** Task 15 Step 4's `drawio.md` brief is corrected: layout comes
+  from Graphviz and edge routing from the owned emitter's `orthogonalEdgeStyle` declaration
+  (NOT from @drawio/mcp upstream); `@drawio/mcp`'s `search_shapes` remains optionally
+  available for branded icons; hand-edits to a compiled `.drawio` require
+  `hand_owned: true` in the manifest.
 
 ---
 
@@ -276,7 +300,7 @@ git commit -m "feat: scaffold designcore package with backend doctor"
 
 **Interfaces:**
 - Consumes: `designcore doctor` from Task 1.
-- Produces: a written decision on (a) whether `drawio` CLI export works headless and (b) which Excalidraw renderer, if any, works. Tasks 12 and 14 depend on this decision.
+- Produces: a written decision on (a) whether `drawio` CLI export works headless and (b) which Excalidraw renderer, if any, works. Tasks 10, 11 and 14 depend on this decision.
 
 This task is empirical, not TDD. It exists because the spec's R1 and R2 gate the entire verify loop, and discovering them in Task 14 would waste the intervening work.
 
@@ -320,7 +344,7 @@ Record which invocation worked and whether `--no-sandbox` was also required.
 npx -y @drawio/mcp --help
 ```
 
-Record the actual invocation surface: whether it can be driven one-shot from the command line, or only as an MCP stdio server. Task 13 needs to know which.
+Record the actual invocation surface: whether it can be driven one-shot from the command line, or only as an MCP stdio server. Task 10 needs to know which.
 
 - [ ] **Step 4: Probe an Excalidraw renderer (risk R2)**
 
@@ -346,7 +370,7 @@ node probe.mjs; echo "exit=$?"
 Create `docs/plans/2026-08-16-render-backend-findings.md` recording, for each of the three probes: the exact working command, the exit code, and a one-line verdict (`works` / `works with <workaround>` / `unavailable`). For any probe that failed, state the chosen fallback:
 
 - draw.io export unavailable → Task 14 renders the converted XML through an alternative exporter; record which.
-- Excalidraw render unavailable → Task 12 is reduced to lint-only, and the `concept-sketch` skill must state that limitation explicitly in its SKILL.md rather than implying verification.
+- Excalidraw render unavailable → Task 11's render_excalidraw is reduced to lint-only (superseded: the probe succeeded; see amendment A3), and the `concept-sketch` skill must state that limitation explicitly in its SKILL.md rather than implying verification.
 
 - [ ] **Step 6: Reconcile the design doc**
 
@@ -840,7 +864,7 @@ git commit -m "feat: add structural and density lint over the graph spec"
 - Consumes: `designcore.spec.DiagramSpec`.
 - Produces: `designcore.emit.mermaid.emit_mermaid(spec: DiagramSpec) -> str`.
 
-Mermaid is both a delivery format and the intermediate the draw.io adapter converts from (Task 13), so its output must be correct before anything downstream.
+Mermaid is a delivery format in its own right, so its output must be correct before anything downstream. (The drawio emitter is owned and Graphviz-driven — Task 10, per amendment A1 — and does not convert from mermaid.)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1526,7 +1550,7 @@ git commit -m "feat: add geometry lint for overlap, off-canvas, and clipping"
 - Consumes: `designcore.spec.DiagramSpec`, `designcore.layout.Placement`.
 - Produces: `designcore.emit.excalidraw.emit_excalidraw(spec: DiagramSpec, placements: dict[str, Placement]) -> dict`.
 
-This is the only emitter DesignCore owns outright, because no upstream Mermaid→Excalidraw converter exists. Positions still come from Graphviz.
+This is one of two emitters DesignCore owns outright (the drawio emitter is owned too — see amendments A1/A4), because no upstream Mermaid→Excalidraw converter exists. Positions still come from Graphviz.
 
 - [ ] **Step 1: Write the failing tests**
 
