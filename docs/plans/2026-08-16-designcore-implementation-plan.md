@@ -369,7 +369,7 @@ node probe.mjs; echo "exit=$?"
 
 Create `docs/plans/2026-08-16-render-backend-findings.md` recording, for each of the three probes: the exact working command, the exit code, and a one-line verdict (`works` / `works with <workaround>` / `unavailable`). For any probe that failed, state the chosen fallback:
 
-- draw.io export unavailable → Task 14 renders the converted XML through an alternative exporter; record which.
+- draw.io export unavailable → Task 11 renders the emitted XML through an alternative exporter; record which.
 - Excalidraw render unavailable → Task 11's render_excalidraw is reduced to lint-only (superseded: the probe succeeded; see amendment A3), and the `concept-sketch` skill must state that limitation explicitly in its SKILL.md rather than implying verification.
 
 - [ ] **Step 6: Reconcile the design doc**
@@ -1901,7 +1901,7 @@ def emit_drawio(spec: DiagramSpec, convert: Converter) -> str:
 - [ ] **Step 4: Run the tests and make sure they pass**
 
 Run: `uv run pytest tests/test_emit_drawio.py -v`
-Expected: 5 passed
+Expected: all golden-XML tests pass (this task's body is superseded by amendment A1; test count follows the amended tests)
 
 - [ ] **Step 5: Verify the real converter**
 
@@ -1923,7 +1923,7 @@ Expected: a `.drawio` file that opens in draw.io with two connected, non-overlap
 
 ```bash
 git add src/designcore/emit/drawio.py tests/test_emit_drawio.py
-git commit -m "feat: add drawio emitter delegating layout to @drawio/mcp"
+git commit -m "feat: add owned drawio emitter driven by graphviz placements"
 ```
 
 ---
@@ -2068,7 +2068,7 @@ def render_excalidraw(source: Path, out_dir: Path, **_kwargs) -> list[Path]:
 - [ ] **Step 5: Run the tests and make sure they pass**
 
 Run: `uv run pytest tests/test_render_backends.py -v`
-Expected: 3 passed
+Expected: 5 passed (amendment A3 added two tests)
 
 - [ ] **Step 6: Verify draw.io export against the real binary**
 
@@ -2342,7 +2342,7 @@ git commit -m "feat: add diagrams.yaml manifest with integrity checks"
 
 **Interfaces:**
 - Consumes: everything from Tasks 3–12.
-- Produces: `designcore.pipeline.compile_diagram(spec, fmt, out_root, deps) -> DiagramEntry`, `designcore.pipeline.Deps(convert, render_map, layout)` (a container for injected backends), `designcore.pipeline.lint_diagram(spec, placements, svg_path) -> list[Finding]`, and the CLI subcommands `new`, `render`, `lint`, `check`, `doctor`.
+- Produces: `designcore.pipeline.compile_diagram(spec, fmt, out_root, deps) -> DiagramEntry`, `designcore.pipeline.Deps(render_map, layout, layout_groups)` (a container for injected backends; amendment A4 removed `convert`), `designcore.pipeline.lint_diagram(spec, placements, svg_path) -> list[Finding]`, and the CLI subcommands `new`, `render`, `lint`, `check`, `doctor`.
 
 `Deps` exists so the pipeline is testable without any external binary. Production callers use `Deps.default()`.
 
