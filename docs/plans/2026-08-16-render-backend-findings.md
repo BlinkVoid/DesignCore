@@ -64,7 +64,7 @@ No fallback exporter needed. R1 is retired.
 
 ---
 
-## 2. Probe: `@drawio/mcp` invocation surface (R4/R5 context, Task 13)
+## 2. Probe: `@drawio/mcp` invocation surface (R4/R5 context, Task 10)
 
 **Verdict: works as MCP stdio server only — no one-shot CLI mode; and it does NOT return mxGraph XML headlessly.**
 
@@ -81,9 +81,11 @@ No fallback exporter needed. R1 is retired.
 
 **Consequence for the design:** the spec's claim (§2, §6 drawio row) that `@drawio/mcp`
 "accepts Mermaid as input and returns editable native mxGraph XML" is not borne out on the
-stdio path. Task 13 must re-derive the mermaid→mxGraph conversion: candidates are driving the
-editor URL flow, an owned emitter, or another converter; `search_shapes` and the multi-page
-tools remain usable as documented. This is recorded in the R4/R5 rows of the risk table.
+stdio path. **RESOLVED 2026-08-16:** the user decided the mermaid→mxGraph conversion path is
+retired in favour of an **owned Graphviz-driven mxGraph emitter** (`emit/drawio.py`, plan
+Task 10) — see the "Execution amendments (2026-08-16, post-Task-2 gate)" section of
+`2026-08-16-designcore-implementation-plan.md`. `search_shapes` and the multi-page tools
+remain usable as documented. This is recorded in the R4/R5 rows of the risk table.
 
 ---
 
@@ -115,7 +117,7 @@ const { exportToSvg } = await import("@excalidraw/utils"); // dynamic import AFT
 // exportToSvg({ elements, appState: { exportBackground: true }, files: null }) → SVGElement
 ```
 
-Caveats for Task 12:
+Caveats for Task 11:
 
 - Shims must be installed **before** importing `@excalidraw/utils` (dynamic import).
 - Text elements load fonts through `document.fonts`/`FontFace`, which are stubbed here;
@@ -123,7 +125,7 @@ Caveats for Task 12:
 - SVG is proven; PNG would still need a rasterizer (not probed, not required for the vision
   pass if the PNG step is served by another tool).
 
-R2 is retired: Task 12 keeps the render + vision loop, implemented through this shim. The
+R2 is retired: Task 11 keeps the render + vision loop, implemented through this shim. The
 fallback (lint-only excalidraw) is **not** triggered.
 
 ---
@@ -132,7 +134,12 @@ fallback (lint-only excalidraw) is **not** triggered.
 
 | Risk | Outcome | Downstream instruction |
 |---|---|---|
-| R1 | drawio CLI export **works** | `render/drawio.py`: `xvfb-run -a drawio -x ...` (or plain when `DISPLAY` set); input path under `$HOME`, never `/tmp` (snap confinement) |
-| R2 | excalidraw SVG render **works** via jsdom shim | Task 12: keep render+vision; ship the shim in `render/excalidraw.py`'s node helper; verify text elements separately |
+| R1 | drawio CLI export **works** | `render/drawio.py` (Task 11): `xvfb-run -a drawio -x ...` (or plain when `DISPLAY` set); input path under `$HOME`, never `/tmp` (snap confinement) |
+| R2 | excalidraw SVG render **works** via jsdom shim | Task 11: keep render+vision; ship the shim in `render/excalidraw.py`'s node helper; verify text elements separately. PNG rasterization is owned by Task 11 via headless Chrome (`/usr/bin/google-chrome` is installed on this machine) |
 | R3 | both tools now present | graphviz installed by local-extract (no sudo), not apt; doctor's apt-based hint is aspirational on this machine — installation is done and recorded here |
-| R4/R5 | `@drawio/mcp` is stdio-only and opens a browser editor; no XML returned | Task 13 must re-derive the mermaid→mxGraph path before `emit/drawio.py` is built on it |
+| R4/R5 | `@drawio/mcp` is stdio-only and opens a browser editor; no XML returned | **RESOLVED:** conversion path retired; Task 10 builds `emit/drawio.py` as an owned Graphviz-driven mxGraph emitter (see the plan's "Execution amendments" section). `search_shapes` / multi-page tools remain usable |
+
+**Verification-path caveat:** the plan's Task 10 Step 5 and Task 11 Step 6 verification
+commands reference `/tmp/dc-probe` paths, which **cannot** work with the strictly-confined
+drawio snap (private `/tmp`, per §1). Those verifications must run from a path under `$HOME`
+(e.g. `~/dc-probe`) — recorded as amendment A5 in the plan.

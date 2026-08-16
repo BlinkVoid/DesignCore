@@ -42,9 +42,12 @@ The draw.io space is no longer empty. This materially shaped the design.
 `open_drawio_csv`, `open_drawio_mermaid`, `search_shapes` (~10k AWS/Azure/GCP/Cisco/K8s/BPMN
 stencils auto-discovered from the real editor sidebar), and `list_pages` / `get_page` /
 `set_page` for multi-page `.drawio` files. It supports libavoid obstacle-avoiding edge routing
-and an optional ELK layered-layout pass. Critically, **it accepts Mermaid as input and returns
-editable native mxGraph XML**. Its desktop-Electron integration is flagged experimental
-(upstream CSP issue); the non-Electron path is the one to use.
+and an optional ELK layered-layout pass. ~~Critically, **it accepts Mermaid as input and returns
+editable native mxGraph XML**.~~ **Disproved by the 2026-08-16 probe** (see
+`2026-08-16-render-backend-findings.md` §2): the tool is stdio-only and `open_drawio_mermaid`
+opens a browser editor URL rather than returning mxGraph XML to the caller; the drawio emit
+path is therefore an owned Graphviz-driven emitter (§6). Its desktop-Electron integration is
+flagged experimental (upstream CSP issue); the non-Electron path is the one to use.
 
 **`Agents365-ai/drawio-skill`** is the most built-out community skill: 11 presets (UML, C4,
 BPMN, network), 13 extractors (Python/JS/Go/Rust import graphs, Terraform, Kubernetes,
@@ -78,7 +81,7 @@ Sources:
 
 | # | Decision | Rationale | Rejected alternative |
 |---|---|---|---|
-| D1 | **Judgment layer over existing tools.** DesignCore owns what to draw, when, and whether it reads well. Rendering, layout, and shape catalogs are delegated. | The rendering problem is solved and actively maintained by draw.io's own team. The judgment problem is not solved by anyone and is what actually makes documentation clearer. | Building a full generator stack — rebuilds ELK/libavoid/shape indexes we would then have to maintain against upstream. |
+| D1 | **Judgment layer over existing tools.** DesignCore owns what to draw, when, and whether it reads well. Rendering (drawio CLI, mmdc) and shape catalogs remain delegated; layout is Graphviz; the drawio and excalidraw emitters are owned (the drawio one became owned after the 2026-08-16 probe disproved the upstream converter). | The rendering problem is solved and actively maintained by draw.io's own team. The judgment problem is not solved by anyone and is what actually makes documentation clearer. | Building a full generator stack — rebuilds ELK/libavoid/shape indexes we would then have to maintain against upstream. |
 | D2 | **Skills named by purpose, format chosen inside.** `architecture-diagram`, `flow-diagram`, `concept-sketch`, sharing one format/mechanics layer. | Matches how diagrams are actually requested ("draw the request flow", not "make me a mermaid"). Format is an implementation detail the skill decides. Shared layer prevents triplicated format mechanics. | Format-named skills (`mermaid`/`drawio`/`excalidraw`) — forces the caller to pre-decide the thing the skill is best positioned to judge. |
 | D3 | **The model never writes x/y.** Coordinates come from a layout engine, always. | This is the single documented cause of bad LLM diagrams across all prior art. | Trusting model placement with a fix-up pass — fights the failure instead of removing it. |
 | D4 | **Render + deterministic lint + bounded vision self-check.** | Lint catches what is nameable; the vision pass catches hierarchy and readability, which no linter can express. Bounding to 2 rounds keeps cost finite. | Lint-only (nothing judges whether it reads well); layout-engine-only (silent failures ship). |
@@ -119,7 +122,7 @@ DesignCore/
 │   │   └── density.py        # node/edge count thresholds → "split this"
 │   ├── emit/
 │   │   ├── mermaid.py
-│   │   ├── drawio.py         # via @drawio/mcp conversion + restyle pass
+│   │   ├── drawio.py         # owned emitter (Graphviz placements → mxGraph XML)
 │   │   └── excalidraw.py     # owned emitter (no upstream converter exists)
 │   └── render/
 │       ├── mermaid.py        # mmdc
@@ -187,11 +190,12 @@ them to each format's idiom.
 | Target | Compilation path | Geometry source |
 |---|---|---|
 | **mermaid** | spec → mermaid text | mermaid's own renderer |
-| **drawio** | spec → mermaid → `@drawio/mcp` `open_drawio_mermaid` → editable mxGraph XML → restyle pass (roles/emphasis → styles, `search_shapes` for branded icons) | ELK layered + libavoid routing, from upstream |
+| **drawio** | spec → Graphviz `dot` positions → owned mxGraph XML emitter (roles/emphasis mapped to styles; `search_shapes` for branded icons) | Graphviz |
 | **excalidraw** | spec → Graphviz `dot` positions → `.excalidraw` JSON emitter | Graphviz |
 
-Excalidraw is the sole owned emitter, because no upstream converter exists. Its positions still
-come from Graphviz — D3 holds for all three formats.
+Excalidraw and drawio are the owned emitters — Excalidraw because no upstream converter
+exists, drawio because the 2026-08-16 probe retired the planned `@drawio/mcp` conversion path.
+Their positions still come from Graphviz — D3 holds for all three formats.
 
 ### Format selection rubric (lives in `_shared/references/format-selection.md`)
 
@@ -341,13 +345,15 @@ Deferred deliberately; none of these require rework to add later.
 | R1 | ~~`drawio` snap CLI headless export may require `xvfb`~~ **Retired 2026-08-16** (probe: `docs/plans/2026-08-16-render-backend-findings.md` §1) | — | Export works: `xvfb-run -a drawio -x -f png -o out.png in.drawio` (plain works when `DISPLAY` is set; `--no-sandbox` not needed — the snap injects it). Hard constraint discovered: the strictly-confined snap cannot read `/tmp`; input/output paths must live under `$HOME`. `render/drawio.py` must honor this. |
 | R2 | ~~No proven `.excalidraw` → SVG/PNG renderer~~ **Retired 2026-08-16** (probe: findings §3) | — | `@excalidraw/utils` `exportToSvg` works in Node **with a jsdom DOM shim** (window/document/navigator/devicePixelRatio/location/rAF/FontFace installed before a dynamic import). Plain Node fails at import time (`window is not defined`). Task 12 keeps render+vision via this shim; text-element rendering through stubbed fonts remains to be verified there. |
 | R3 | `mmdc` and Graphviz `dot` not installed on this machine | Nothing renders | **Resolved 2026-08-16 without sudo:** `mmdc` via `npm install -g` (nvm user prefix); graphviz via local-extract (`apt-get download` + `dpkg -x` into `~/.local/share/designcore/graphviz/rootfs`, wrapper at `~/.local/bin/dot` setting `LD_LIBRARY_PATH`/`GVBINDIR`, `dot -c` once) — **not** via `sudo apt install` as doctor's hint implies. All four backends report `ok`. Method recorded in findings §0. |
-| R4 | `@drawio/mcp` desktop-Electron path upstream-broken (CSP) — **amended 2026-08-16:** probing (findings §2) shows the stdio server is the *only* invocation surface, and `open_drawio_mermaid` opens a browser editor URL rather than returning mxGraph XML | The mermaid→mxGraph conversion path assumed in §6 (drawio row) does not exist headlessly | Task 13 must re-derive the conversion path (drive the editor flow, owned emitter, or another converter) before `emit/drawio.py` is built on it; `search_shapes` / multi-page tools remain usable as documented. |
-| R5 | Dependency on upstream `@drawio/mcp` tool names/shapes — **amended 2026-08-16:** confirmed parameter shape differs from expectation (`content`, not `mermaid`) | Breakage on upstream change; conversion itself unproven (see R4) | Adapter isolates all MCP calls in `emit/drawio.py`; golden tests pin the expected contract. Task 13 re-derivation (R4) precedes this. |
+| R4 | `@drawio/mcp` desktop-Electron path upstream-broken (CSP) — **amended 2026-08-16:** probing (findings §2) shows the stdio server is the *only* invocation surface, and `open_drawio_mermaid` opens a browser editor URL rather than returning mxGraph XML | The mermaid→mxGraph conversion path assumed in §6 (drawio row) does not exist headlessly | **Resolved 2026-08-16:** the conversion path is retired; `emit/drawio.py` is an owned emitter driven by Graphviz placements (§6 drawio row; plan "Execution amendments", A1). `search_shapes` / multi-page tools remain usable as documented. |
+| R5 | Dependency on upstream `@drawio/mcp` tool names/shapes — **amended 2026-08-16:** confirmed parameter shape differs from expectation (`content`, not `mermaid`) | Breakage on upstream change; conversion itself unproven (see R4) | **Resolved 2026-08-16 with R4:** no conversion dependency remains — the owned emitter calls no `@drawio/mcp` conversion tool. Any future optional use (`search_shapes`, multi-page tools) stays isolated in `emit/drawio.py`; golden tests pin the expected contract. |
 
 ---
 
 ## 14. Open questions
 
 None blocking. R1 and R2 were answered empirically on 2026-08-16 (both retired — see the risk
-table and `docs/plans/2026-08-16-render-backend-findings.md`). The new open question is the
-headless mermaid→mxGraph conversion path (R4), to be resolved in Task 13.
+table and `docs/plans/2026-08-16-render-backend-findings.md`). R4's headless
+mermaid→mxGraph question was resolved the same day by decision: the conversion path is
+retired and the drawio emitter is owned and Graphviz-driven (§6; plan "Execution
+amendments", A1).

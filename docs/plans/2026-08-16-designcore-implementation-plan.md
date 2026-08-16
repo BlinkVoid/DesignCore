@@ -24,6 +24,47 @@
 
 ---
 
+## Execution amendments (2026-08-16, post-Task-2 gate)
+
+The Task 2 probe (`docs/plans/2026-08-16-render-backend-findings.md`) disproved the design's
+assumption that `@drawio/mcp` converts Mermaid→mxGraph XML headlessly. The user has decided:
+the drawio emit path is an **owned emitter** — spec → Graphviz placements → DesignCore-written
+mxGraph XML, mirroring the Excalidraw emitter — rendered via the proven `drawio` CLI. The
+following amendments are **binding** and supersede the named task steps below.
+
+- **A1 (supersedes Task 10 design):** `emit/drawio.py` is an OWNED emitter:
+  `emit_drawio(spec: DiagramSpec, placements: dict[str, Placement], groups: dict[str, Placement] | None = None) -> str`.
+  It emits `<mxfile><diagram><mxGraphModel><root>` XML: one vertex `mxCell` per node with
+  absolute geometry from `placements` (never from the spec), one edge `mxCell` per edge
+  (`edge="1"`, `source`/`target`, `edgeStyle=orthogonalEdgeStyle`, label via `value`), and one
+  container `mxCell` per group (bounds from `groups`). Role/emphasis map to style strings
+  reusing the plan's `ROLE_STYLE`/`EMPHASIS_STYLE` tables. The `Converter` alias,
+  `mcp_converter`, and the restyle-after-conversion design are DELETED. Tests become
+  golden-XML tests (parseable, correct cells/geometry/styles) plus a real render through the
+  drawio CLI from a path under `$HOME`.
+- **A2 (extends Task 7):** `layout.py` also provides
+  `layout_groups(spec, run=subprocess.run, which=shutil.which) -> dict[str, Placement]`
+  returning each group's bounding box (from Graphviz cluster `bb`, converted to top-left
+  pixels like node placements), plus a unit test using the Task 7 FAKE_JSON fixture's
+  `cluster_g` entry.
+- **A3 (supersedes parts of Task 11):** `render/drawio.py` prefixes the export command with
+  `xvfb-run -a` when `DISPLAY` is unset, and raises a `RenderError` explaining snap
+  confinement if source/output paths are under `/tmp`. `render/excalidraw.py` IS
+  implementable: a Node helper (in `src/designcore/render/js/` with its own `package.json`
+  depending on `@excalidraw/utils` and `jsdom`) applies the jsdom shim from the findings doc
+  §3 (shims BEFORE the dynamic import), converts `.excalidraw` JSON → SVG; PNG comes from
+  headless Chrome (`google-chrome --headless=new --screenshot`) rasterizing that SVG. Missing
+  node_modules or Chrome → `BackendMissing` with the exact install command. The lint-only
+  fallback module in Task 11 Step 4 is NOT used.
+- **A4 (amends Task 13):** `Deps` gains
+  `layout_groups: Callable[[DiagramSpec], dict[str, Placement]]`; the drawio branch of
+  `_source_text` calls `emit_drawio(spec, deps.layout(spec), deps.layout_groups(spec))`.
+  Pipeline tests' fake deps supply both (groups may return `{}`).
+- **A5:** Task 10 Step 5 and Task 11 Step 6 verification paths move from `/tmp/dc-probe` to
+  `~/dc-probe` (snap confinement).
+
+---
+
 ### Task 1: Repository scaffold and `designcore doctor`
 
 **Files:**
