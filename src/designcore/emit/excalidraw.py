@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import zlib
 from typing import Any
 
 from designcore.layout import Placement
@@ -10,6 +11,35 @@ from designcore.spec import DiagramSpec
 EDGE_FONT_SIZE = 12
 STROKE_WIDTH = {"normal": 1, "primary": 3, "muted": 1}
 OPACITY = {"normal": 100, "primary": 100, "muted": 55}
+
+# Excalidraw's own palette. Roles get a colour and a fill so a scene reads as
+# a sketch rather than a wireframe; `external` stays unfilled and dashed to
+# match the convention the mermaid and drawio emitters use for things outside
+# the system boundary.
+ROLE_STYLE: dict[str, dict[str, str]] = {
+    "actor": {"strokeColor": "#1971c2", "backgroundColor": "#a5d8ff", "strokeStyle": "solid"},
+    "service": {"strokeColor": "#1e1e1e", "backgroundColor": "#e9ecef", "strokeStyle": "solid"},
+    "store": {"strokeColor": "#2f9e44", "backgroundColor": "#b2f2bb", "strokeStyle": "solid"},
+    "infra": {"strokeColor": "#6741d9", "backgroundColor": "#d0bfff", "strokeStyle": "solid"},
+    "external": {
+        "strokeColor": "#868e96",
+        "backgroundColor": "transparent",
+        "strokeStyle": "dashed",
+    },
+    "note": {"strokeColor": "#f08c00", "backgroundColor": "#ffec99", "strokeStyle": "solid"},
+}
+DEFAULT_ROLE_STYLE = ROLE_STYLE["service"]
+
+
+def _seed(element_id: str) -> int:
+    """A stable per-element seed.
+
+    rough.js derives its hand-drawn jitter from this, so a single shared seed
+    makes every shape wobble identically and the scene reads as mechanically
+    repeated rather than drawn. crc32 keeps it varied but deterministic --
+    Python's hash() is salted per process and would change every render.
+    """
+    return zlib.crc32(element_id.encode("utf-8")) & 0x7FFFFFFF
 
 
 def _base(element_id: str, x: float, y: float, width: float, height: float) -> dict[str, Any]:
@@ -30,7 +60,7 @@ def _base(element_id: str, x: float, y: float, width: float, height: float) -> d
         "groupIds": [],
         "frameId": None,
         "roundness": None,
-        "seed": 1,
+        "seed": _seed(element_id),
         "version": 1,
         "versionNonce": 1,
         "isDeleted": False,
@@ -46,17 +76,31 @@ def _connection_points(
 ) -> tuple[tuple[float, float], tuple[float, float]]:
     """Pick the box edges an arrow should leave from and arrive at.
 
-    Derived from where the boxes actually sit rather than assumed
-    left-to-right: Graphviz honours `direction`, so under the default `TB` a
-    hardcoded right-edge exit sends the arrow diagonally backwards through
-    both boxes. Whichever axis the boxes are further apart on wins, so this
-    follows the layout for all four directions.
+    Chosen by which axis actually *separates* the two boxes, not by which
+    centre delta is larger. In a layered TB graph two boxes routinely overlap
+    horizontally while sitting on different ranks, and their centres can still
+    be further apart on x -- judging by centre distance then exits the right
+    edge and drags the arrow backwards across the diagram. Separation is the
+    property that matters: an arrow can only leave cleanly on an axis where
+    there is a gap.
     """
     start_cx, start_cy = start.x + start.width / 2, start.y + start.height / 2
     end_cx, end_cy = end.x + end.width / 2, end.y + end.height / 2
     dx, dy = end_cx - start_cx, end_cy - start_cy
 
-    if abs(dx) >= abs(dy):
+    separated_x = end.x >= start.x + start.width or end.x + end.width <= start.x
+    separated_y = end.y >= start.y + start.height or end.y + end.height <= start.y
+
+    if separated_x and not separated_y:
+        horizontal = True
+    elif separated_y and not separated_x:
+        horizontal = False
+    else:
+        # Both axes separated (a diagonal neighbour) or neither (overlapping
+        # boxes): fall back to the dominant direction of travel.
+        horizontal = abs(dx) >= abs(dy)
+
+    if horizontal:
         if dx >= 0:
             return (start.x + start.width, start_cy), (end.x, end_cy)
         return (start.x, start_cy), (end.x + end.width, end_cy)
@@ -72,6 +116,9 @@ def emit_excalidraw(spec: DiagramSpec, placements: dict[str, Placement]) -> dict
         box = placements[node.id]  # KeyError is correct: never invent geometry
         rect = _base(node.id, box.x, box.y, box.width, box.height)
         rect["type"] = "rectangle"
+        rect["roundness"] = {"type": 3}  # how Excalidraw draws a rectangle
+        rect["fillStyle"] = "hachure"    # the sketchy fill, not a flat block
+        rect.update(ROLE_STYLE.get(node.role, DEFAULT_ROLE_STYLE))
         rect["strokeWidth"] = STROKE_WIDTH[node.emphasis]
         rect["opacity"] = OPACITY[node.emphasis]
         rect["boundElements"] = [{"type": "text", "id": f"{node.id}-label"}]

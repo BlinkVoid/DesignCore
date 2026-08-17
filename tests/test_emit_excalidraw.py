@@ -105,3 +105,82 @@ def test_edge_label_box_grows_with_the_text():
 
     assert _label_width("a much longer edge label") > _label_width("hi")
     assert _label_width("a much longer edge label") >= 24 * 12 * 0.5
+
+
+def test_stacked_boxes_connect_vertically_even_when_centres_are_offset():
+    """Real TB layout from FigmentLab: the boxes overlap horizontally and are
+    cleanly separated vertically, but their centres are further apart on x.
+    Choosing the axis by centre distance sent the arrow out of the right edge
+    and backwards across the diagram."""
+    arrow = _arrow(
+        "TB",
+        {"a": Placement("a", 0, 0, 297, 36), "b": Placement("b", 204.5, 87, 172, 36)},
+    )
+    assert arrow["x"] == 148.5          # centre of a, not its right edge
+    assert arrow["y"] == 36             # bottom edge of a
+    assert arrow["height"] == 51        # down to the top edge of b
+    assert arrow["width"] == 142.0      # lateral drift only, never negative-backwards
+
+
+def test_separated_axis_wins_over_larger_centre_delta():
+    """Boxes side by side but vertically overlapping must connect horizontally
+    even if the vertical centre delta happens to be larger."""
+    arrow = _arrow(
+        "LR",
+        {"a": Placement("a", 0, 0, 40, 200), "b": Placement("b", 90, 150, 40, 200)},
+    )
+    assert arrow["x"] == 40             # right edge of a
+    assert arrow["width"] == 50         # to left edge of b
+
+
+def _rects(spec, placements):
+    return [e for e in emit_excalidraw(spec, placements)["elements"] if e["type"] == "rectangle"]
+
+
+def _role_spec(*roles):
+    nodes = tuple(Node(id=f"n{i}", label=f"N{i}", role=r) for i, r in enumerate(roles))
+    placements = {n.id: Placement(n.id, i * 200, 0, 100, 50) for i, n in enumerate(nodes)}
+    spec = DiagramSpec(
+        id="d", title="T", kind="concept", question="Q?", direction="LR",
+        nodes=nodes, edges=(),
+    )
+    return spec, placements
+
+
+def test_every_shape_gets_its_own_seed():
+    """rough.js derives the hand-drawn wobble from the seed, so one shared
+    seed makes every box wobble identically -- which reads as mechanical."""
+    spec, placements = _role_spec("service", "service", "service", "service")
+    seeds = [r["seed"] for r in _rects(spec, placements)]
+    assert len(set(seeds)) == len(seeds)
+
+
+def test_seeds_are_stable_across_runs():
+    spec, placements = _role_spec("service", "store")
+    assert [r["seed"] for r in _rects(spec, placements)] == [
+        r["seed"] for r in _rects(spec, placements)
+    ]
+
+
+def test_rectangles_are_rounded_like_excalidraw_draws_them():
+    spec, placements = _role_spec("service")
+    assert _rects(spec, placements)[0]["roundness"] == {"type": 3}
+
+
+def test_roles_get_distinct_colours():
+    spec, placements = _role_spec("service", "store", "actor", "note")
+    rects = _rects(spec, placements)
+    assert len({r["backgroundColor"] for r in rects}) > 1
+    assert all(r["backgroundColor"] != "transparent" for r in rects)
+
+
+def test_filled_shapes_use_the_hachure_style():
+    spec, placements = _role_spec("service")
+    assert _rects(spec, placements)[0]["fillStyle"] == "hachure"
+
+
+def test_external_role_is_drawn_dashed_and_unfilled():
+    spec, placements = _role_spec("external")
+    rect = _rects(spec, placements)[0]
+    assert rect["strokeStyle"] == "dashed"
+    assert rect["backgroundColor"] == "transparent"
