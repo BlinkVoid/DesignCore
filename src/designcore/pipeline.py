@@ -72,7 +72,10 @@ def _source_text(spec: DiagramSpec, fmt: str, deps: Deps) -> str:
         return emit_drawio(spec, deps.layout(spec), deps.layout_groups(spec))
     if fmt == "excalidraw":
         routes = deps.layout_edges(spec) if deps.layout_edges else None
-        return json.dumps(emit_excalidraw(spec, deps.layout(spec), routes), indent=2)
+        return json.dumps(
+            emit_excalidraw(spec, deps.layout(spec), routes, deps.layout_groups(spec)),
+            indent=2,
+        )
     raise ValueError(f"unknown format {fmt!r}; expected one of {sorted(SUFFIXES)}")
 
 

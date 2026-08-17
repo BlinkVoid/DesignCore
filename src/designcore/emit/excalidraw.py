@@ -30,6 +30,15 @@ ROLE_STYLE: dict[str, dict[str, str]] = {
 }
 DEFAULT_ROLE_STYLE = ROLE_STYLE["service"]
 
+# A boundary, not a shape: unfilled and dashed so it reads as an enclosure
+# rather than competing with the nodes inside it.
+GROUP_STYLE = {
+    "strokeColor": "#868e96",
+    "backgroundColor": "transparent",
+    "strokeStyle": "dashed",
+    "fillStyle": "hachure",
+}
+
 
 def _seed(element_id: str) -> int:
     """A stable per-element seed.
@@ -113,8 +122,34 @@ def emit_excalidraw(
     spec: DiagramSpec,
     placements: dict[str, Placement],
     routes: dict[tuple[str, str], tuple[tuple[float, float], ...]] | None = None,
+    groups: dict[str, Placement] | None = None,
 ) -> dict[str, Any]:
     elements: list[dict[str, Any]] = []
+
+    # Groups first: Excalidraw paints in array order, so a container declared
+    # after its members would cover them.
+    for group in spec.groups:
+        box = (groups or {}).get(group.id)
+        if box is None:
+            continue  # no geometry computed for this group; skip rather than invent
+        frame = _base(group.id, box.x, box.y, box.width, box.height)
+        frame["type"] = "rectangle"
+        frame["roundness"] = {"type": 3}
+        frame.update(GROUP_STYLE)
+        elements.append(frame)
+
+        if group.label:
+            caption = _base(f"{group.id}-caption", box.x + 12, box.y + 6, box.width - 24, 18)
+            caption["type"] = "text"
+            caption["text"] = group.label
+            caption["originalText"] = group.label
+            caption["fontSize"] = 14
+            caption["fontFamily"] = 1
+            caption["textAlign"] = "left"
+            caption["verticalAlign"] = "top"
+            caption["strokeColor"] = GROUP_STYLE["strokeColor"]
+            caption["containerId"] = None
+            elements.append(caption)
 
     for node in spec.nodes:
         box = placements[node.id]  # KeyError is correct: never invent geometry

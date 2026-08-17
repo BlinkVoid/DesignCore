@@ -2,7 +2,7 @@ import pytest
 
 from designcore.emit.excalidraw import emit_excalidraw
 from designcore.layout import Placement
-from designcore.spec import DiagramSpec, Edge, Node
+from designcore.spec import DiagramSpec, Edge, Group, Node
 
 SPEC = DiagramSpec(
     id="d", title="T", kind="concept", question="Q?",
@@ -222,3 +222,40 @@ def test_routed_arrow_still_binds_to_its_endpoints():
     )
     assert arrow["startBinding"]["elementId"] == "a"
     assert arrow["endBinding"]["elementId"] == "b"
+
+
+def _grouped():
+    spec = DiagramSpec(
+        id="d", title="T", kind="container", question="Q?", direction="TB",
+        nodes=(Node(id="a", label="A"), Node(id="b", label="B")),
+        edges=(Edge(source="a", target="b"),),
+        groups=(Group(id="tier", label="Data tier", members=("a",)),),
+    )
+    placements = {"a": Placement("a", 20, 20, 60, 30), "b": Placement("b", 20, 150, 60, 30)}
+    groups = {"tier": Placement("tier", 10, 10, 90, 60)}
+    return spec, placements, groups
+
+
+def test_groups_become_labelled_boxes():
+    """mermaid draws subgraphs and drawio draws container cells; dropping them
+    here loses a boundary the spec explicitly declared."""
+    spec, placements, groups = _grouped()
+    elements = emit_excalidraw(spec, placements, None, groups)["elements"]
+    box = next(e for e in elements if e.get("id") == "tier")
+    assert (box["x"], box["y"], box["width"], box["height"]) == (10, 10, 90, 60)
+    assert box["strokeStyle"] == "dashed"
+    assert box["backgroundColor"] == "transparent"
+    assert any(e.get("text") == "Data tier" for e in elements)
+
+
+def test_group_boxes_are_emitted_before_their_members():
+    """Excalidraw paints in array order, so a container declared after its
+    members would cover them."""
+    spec, placements, groups = _grouped()
+    ids = [e.get("id") for e in emit_excalidraw(spec, placements, None, groups)["elements"]]
+    assert ids.index("tier") < ids.index("a")
+
+
+def test_groups_are_optional():
+    spec, placements, _ = _grouped()
+    assert emit_excalidraw(spec, placements)["elements"]
