@@ -112,10 +112,22 @@ def compile_diagram(
 
 
 def lint_diagram(
-    spec: DiagramSpec, placements: dict[str, Placement], svg_path: Path | None
+    spec: DiagramSpec,
+    placements: dict[str, Placement],
+    svg_path: Path | None,
+    groups: dict[str, Placement] | None = None,
 ) -> list[Finding]:
+    """Run every deterministic check over one diagram.
+
+    Group boxes are checked separately from node placements, never merged
+    with them: a container encloses its members by construction, so a single
+    combined overlap pass reports every group as colliding with everything it
+    holds.
+    """
     findings = check_structure(spec) + check_density(spec)
     findings += check_geometry(list(placements.values()))
+    if groups:
+        findings += check_geometry(list(groups.values()))
     if svg_path is not None and Path(svg_path).exists():
         findings += check_svg_bounds(Path(svg_path))
     return findings

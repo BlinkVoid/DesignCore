@@ -113,3 +113,22 @@ def test_lint_includes_group_boxes_in_the_overlap_check():
     }
     codes = {f.code for f in lint_diagram(SPEC, overlapping, None)}
     assert "NODE_OVERLAP" in codes
+
+
+def test_group_box_does_not_overlap_its_own_members():
+    """A group box contains its members by construction, so folding group
+    boxes into the node placements reports every group as overlapping every
+    node it holds. Real specs tripped this immediately."""
+    nodes = {"a": Placement("a", 20, 20, 60, 30), "b": Placement("b", 120, 20, 60, 30)}
+    groups = {"g": Placement("g", 10, 10, 180, 50)}
+    assert lint_diagram(SPEC, nodes, None, groups=groups) == []
+
+
+def test_overlapping_group_boxes_are_still_flagged():
+    nodes = {"a": Placement("a", 20, 20, 60, 30)}
+    groups = {
+        "g": Placement("g", 10, 10, 100, 50),
+        "h": Placement("h", 50, 10, 100, 50),
+    }
+    codes = [f.code for f in lint_diagram(SPEC, nodes, None, groups=groups)]
+    assert codes == ["NODE_OVERLAP"]

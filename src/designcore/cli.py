@@ -110,11 +110,13 @@ def _cmd_lint(args: argparse.Namespace) -> int:
     # mermaid the layout is recomputed by the renderer, so check_svg_bounds
     # over the real SVG is the only meaningful geometry check.
     placements: dict = {}
+    groups: dict = {}
     if spec.nodes and fmt in GEOMETRY_FORMATS:
         deps = Deps.default()
-        placements = {**deps.layout(spec), **deps.layout_groups(spec)}
+        placements = deps.layout(spec)
+        groups = deps.layout_groups(spec)
 
-    findings = lint_diagram(spec, placements, svg)
+    findings = lint_diagram(spec, placements, svg, groups=groups)
     if not findings:
         print(f"{args.id}: clean")
         return 0
