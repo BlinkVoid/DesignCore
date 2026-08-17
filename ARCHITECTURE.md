@@ -23,7 +23,7 @@ no aesthetic decisions, and the skills compute no geometry.
 | module | responsibility |
 |---|---|
 | `spec.py` | the graph spec model and its validation; rejects coordinates |
-| `layout.py` | Graphviz invocation; node placements and group bounding boxes |
+| `layout.py` | Graphviz invocation; node placements, group bounding boxes, edge splines |
 | `emit/` | `mermaid.py`, `drawio.py`, `excalidraw.py` — spec + placements → source |
 | `render/` | one module per backend, plus `js/` (the Excalidraw Node helper) |
 | `lint/` | `structural.py`, `density.py`, `geometry.py` → `Finding` |

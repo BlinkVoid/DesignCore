@@ -192,7 +192,7 @@ them to each format's idiom.
 |---|---|---|
 | **mermaid** | spec → mermaid text | mermaid's own renderer |
 | **drawio** | spec → Graphviz `dot` positions → owned mxGraph XML emitter (roles/emphasis mapped to styles; `search_shapes` for branded icons) | Graphviz |
-| **excalidraw** | spec → Graphviz `dot` positions → `.excalidraw` JSON emitter | Graphviz |
+| **excalidraw** | spec → Graphviz `dot` positions *and edge splines* → `.excalidraw` JSON emitter | Graphviz |
 
 Excalidraw and drawio are the owned emitters — Excalidraw because no upstream converter
 exists, drawio because the 2026-08-16 probe retired the planned `@drawio/mcp` conversion path.

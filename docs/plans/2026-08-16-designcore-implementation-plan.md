@@ -236,6 +236,47 @@ these three changed a design decision and are recorded here.
   files under `src/` and `out/` that no entry references. It reports and never deletes:
   removing a file a document may still link to is the author's decision.
 
+## Execution amendments (2026-08-17, excalidraw fidelity pass)
+
+Found by drawing real specs for other projects (FigmentLab) rather than by a test. Each of
+these produced a diagram that was structurally correct, passed lint, and was still wrong to
+look at — the same lesson A15 recorded.
+
+- **A19 (corrects A16):** A16 folded group boxes into the placements handed to
+  `check_geometry`, but a container encloses its members by construction, so every group was
+  reported as overlapping every node inside it — the first grouped diagram was unusable.
+  `lint_diagram` now takes `groups=` separately and runs its own overlap pass over them, so
+  containers are still checked against each other but never against their own contents.
+
+- **A20 (amends Task 9's excalidraw emitter):** `_connection_points` chose its exit axis by
+  the larger centre delta. In a layered TB graph, boxes routinely overlap horizontally while
+  sitting on different ranks, so the arrow left the right edge and swept backwards across the
+  diagram — eight of nine arrows wrong on the first real top-down graph. The axis is now
+  chosen by which one actually *separates* the two boxes. Styling moved to the format's own
+  idiom in the same pass: per-element seeds (crc32 of the id, so still deterministic) instead
+  of a shared `seed=1` that gave every shape an identical rough.js wobble, rounded rectangles,
+  and roles mapped to the Excalidraw palette with hachure fill (external stays dashed and
+  unfilled, matching the other emitters).
+
+- **A21 (amends Task 7's `layout.py`):** `layout.py` parsed only node and cluster geometry out
+  of the `-Tjson` document, discarding the edge splines Graphviz had already computed to avoid
+  intervening nodes — so emitters drew straight point-to-point lines through whatever sat
+  between the endpoints. `layout_edges`/`layout_all` now parse the spline `pos` attribute into
+  top-left pixel paths; note the leading `e,` token is the **arrowhead tip** and belongs at the
+  end of the path, not the start where it is written. The excalidraw emitter follows that path
+  as a multi-point arrow (roundness type 2) and falls back to the straight connection points
+  when no route exists. Arrowheads are declared explicitly rather than left to a viewer default.
+
+- **A22 (amends Task 9's excalidraw emitter):** the mermaid emitter draws subgraphs and the
+  drawio emitter draws container cells, but excalidraw ignored `spec.groups` entirely — an
+  excalidraw render silently dropped boundaries the spec had declared. Groups now emit as
+  labelled dashed enclosures, written *ahead of* their members so Excalidraw's paint order puts
+  them behind, and styled as boundaries rather than as shapes competing with the nodes inside.
+
+**Known gap (not yet fixed):** since A18 a diagram can exist in several formats at once, but
+`designcore lint` has no `--format`; `cli._rendered_svg` returns the first render it finds, so
+lint bounds-checks exactly one of the three and reports `clean` for the diagram as a whole.
+
 ---
 
 ### Task 1: Repository scaffold and `designcore doctor`
