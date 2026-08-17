@@ -72,3 +72,39 @@ def test_lint_finds_the_render_in_its_format_directory(tmp_path):
         encoding="utf-8",
     )
     assert main(["lint", "d", "--root", str(tmp_path)]) == 1
+
+
+def test_check_without_a_manifest_reports_instead_of_traceback(tmp_path, capsys):
+    """Backend and spec errors carry carefully worded install/fix hints; letting
+    them escape main turns each one into a traceback."""
+    assert main(["check", "--root", str(tmp_path)]) == 1
+    assert "diagrams.yaml" in capsys.readouterr().out
+
+
+def test_backend_missing_is_reported_with_its_install_hint(tmp_path, capsys, monkeypatch):
+    import designcore.cli as cli
+    from designcore.render import BackendMissing
+
+    spec = tmp_path / "src" / "d.spec.yaml"
+    spec.parent.mkdir(parents=True)
+    spec.write_text(
+        yaml.safe_dump({"id": "d", "title": "T", "kind": "flow", "question": "Q?",
+                        "nodes": [{"id": "a", "label": "A"}], "edges": []}),
+        encoding="utf-8",
+    )
+
+    def boom(*args, **kwargs):
+        raise BackendMissing("dot is not installed. Install it with: apt install graphviz")
+
+    monkeypatch.setattr(cli, "compile_diagram", boom)
+    assert main(["render", "d", "--root", str(tmp_path)]) == 1
+    assert "apt install graphviz" in capsys.readouterr().out
+
+
+def test_malformed_spec_is_reported_not_raised(tmp_path, capsys):
+    spec = tmp_path / "src" / "d.spec.yaml"
+    spec.parent.mkdir(parents=True)
+    spec.write_text(yaml.safe_dump({"id": "d", "title": "T", "kind": "nonsense",
+                                    "question": "Q?"}), encoding="utf-8")
+    assert main(["lint", "d", "--root", str(tmp_path)]) == 1
+    assert "nonsense" in capsys.readouterr().out

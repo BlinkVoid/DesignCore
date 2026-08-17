@@ -74,6 +74,12 @@ def check_manifest(root: Path) -> list[Finding]:
     findings: list[Finding] = []
 
     for entry in manifest.diagrams:
+        spec = root / entry.spec
+        if not spec.exists():
+            findings.append(
+                Finding("MISSING_SPEC", "error", f"spec {entry.spec} is missing", entry.id)
+            )
+
         source = root / entry.source
         if not source.exists():
             findings.append(
@@ -81,18 +87,26 @@ def check_manifest(root: Path) -> list[Finding]:
             )
             continue
 
+        # Measured against the spec as well as the emitted source: editing a
+        # spec without re-rendering leaves the source untouched, so comparing
+        # only against it reports "clean" for exactly the drift that matters.
+        authored = max(
+            [source.stat().st_mtime] + ([spec.stat().st_mtime] if spec.exists() else [])
+        )
+
         for rendered in entry.rendered:
             target = root / rendered
             if not target.exists():
                 findings.append(
                     Finding("MISSING_RENDER", "error", f"render {rendered} is missing", entry.id)
                 )
-            elif target.stat().st_mtime < source.stat().st_mtime:
+            elif target.stat().st_mtime < authored:
                 findings.append(
                     Finding(
                         "STALE_RENDER",
                         "warning",
-                        f"{rendered} is older than its source; re-run designcore render",
+                        f"{rendered} is older than its spec or source; "
+                        "re-run designcore render",
                         entry.id,
                     )
                 )

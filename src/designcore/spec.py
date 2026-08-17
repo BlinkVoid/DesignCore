@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +18,9 @@ EDGE_KINDS = frozenset({"sync", "async", "data", "dashed"})
 # verbatim, so an unvalidated typo surfaces as a render-time parse failure
 # rather than a SpecError here.
 DIRECTIONS = frozenset({"TB", "BT", "LR", "RL"})
+# Emitters name edge cells `edge-<index>`, so those ids are not the author's
+# to use.
+RESERVED_ID_PREFIX_RE = re.compile(r"^edge-\d+$")
 GEOMETRY_KEYS = frozenset({"x", "y", "width", "height", "position"})
 
 
@@ -91,6 +95,11 @@ def parse_spec(data: dict) -> DiagramSpec:
         node_id = _require(raw, "id")
         if node_id in seen:
             raise SpecError(f"duplicate node id {node_id!r}")
+        if RESERVED_ID_PREFIX_RE.match(node_id):
+            raise SpecError(
+                f"node id {node_id!r} collides with the generated edge id namespace; "
+                "ids matching 'edge-<number>' are reserved for emitted edge cells"
+            )
         seen.add(node_id)
         nodes.append(
             Node(
@@ -118,7 +127,17 @@ def parse_spec(data: dict) -> DiagramSpec:
 
     groups: list[Group] = []
     claimed: set[str] = set()
+    group_ids: set[str] = set()
     for raw in data.get("groups", []):
+        # Groups and nodes share one id namespace in both emitters: mxGraph
+        # cells and Mermaid subgraphs are keyed by the same ids, so a
+        # collision means one of the two is silently dropped at render time.
+        group_id = _require(raw, "id")
+        if group_id in seen:
+            raise SpecError(f"group id {group_id!r} is already used by a node")
+        if group_id in group_ids:
+            raise SpecError(f"duplicate group id {group_id!r}")
+        group_ids.add(group_id)
         members = tuple(str(m) for m in raw.get("members", []))
         for member in members:
             if member not in seen:
@@ -126,7 +145,7 @@ def parse_spec(data: dict) -> DiagramSpec:
             if member in claimed:
                 raise SpecError(f"node {member!r} belongs to more than one group")
             claimed.add(member)
-        groups.append(Group(id=_require(raw, "id"), label=str(raw.get("label", "")), members=members))
+        groups.append(Group(id=group_id, label=str(raw.get("label", "")), members=members))
 
     return DiagramSpec(
         id=spec_id,

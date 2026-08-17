@@ -90,3 +90,21 @@ def test_check_flags_broken_embed_target(tmp_path):
 def test_entry_requires_a_question():
     with pytest.raises(ValueError, match="question"):
         _entry(question="")
+
+
+def test_check_flags_a_render_older_than_its_spec(tmp_path):
+    """Editing the spec without re-rendering is the drift the manifest exists
+    to catch, but staleness was only measured against the emitted source --
+    which does not change until you re-render."""
+    root = _tree(tmp_path, _entry())
+    import os
+    os.utime(root / "out" / "system-context.svg", (1, 1))
+    os.utime(root / "src" / "system-context.drawio", (1, 1))
+    os.utime(root / "src" / "system-context.spec.yaml", (10_000, 10_000))
+    assert [f.code for f in check_manifest(root)] == ["STALE_RENDER"]
+
+
+def test_check_flags_a_missing_spec(tmp_path):
+    root = _tree(tmp_path, _entry())
+    (root / "src" / "system-context.spec.yaml").unlink()
+    assert [f.code for f in check_manifest(root)] == ["MISSING_SPEC"]

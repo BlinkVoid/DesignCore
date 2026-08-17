@@ -88,3 +88,34 @@ def test_accepts_all_four_directions():
             {"id": "d", "title": "T", "kind": "flow", "question": "Q?", "direction": direction}
         )
         assert spec.direction == direction
+
+
+def test_rejects_a_group_id_colliding_with_a_node_id():
+    """Both emitters put groups and nodes in one id namespace: draw.io would
+    emit two mxCells with the same id and silently drop one."""
+    with pytest.raises(SpecError, match="api"):
+        parse_spec({
+            "id": "d", "title": "T", "kind": "flow", "question": "Q?",
+            "nodes": [{"id": "api", "label": "API"}],
+            "groups": [{"id": "api", "label": "API tier", "members": ["api"]}],
+        })
+
+
+def test_rejects_duplicate_group_ids():
+    with pytest.raises(SpecError, match="dup"):
+        parse_spec({
+            "id": "d", "title": "T", "kind": "flow", "question": "Q?",
+            "nodes": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}],
+            "groups": [{"id": "dup", "label": "One", "members": ["a"]},
+                       {"id": "dup", "label": "Two", "members": ["b"]}],
+        })
+
+
+def test_rejects_a_node_id_in_the_generated_edge_namespace():
+    """Edge cells are emitted as edge-0, edge-1, ...; a node named edge-0
+    collides with the first edge's id."""
+    with pytest.raises(SpecError, match="edge-0"):
+        parse_spec({
+            "id": "d", "title": "T", "kind": "flow", "question": "Q?",
+            "nodes": [{"id": "edge-0", "label": "A"}],
+        })

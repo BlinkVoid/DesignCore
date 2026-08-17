@@ -12,7 +12,8 @@ from designcore.doctor import check_backends
 from designcore.lint import has_errors
 from designcore.manifest import Manifest, check_manifest, load_manifest, save_manifest, upsert
 from designcore.pipeline import Deps, compile_diagram, lint_diagram
-from designcore.spec import load_spec
+from designcore.render import BackendMissing, RenderError
+from designcore.spec import SpecError, load_spec
 
 DEFAULT_FORMAT = {
     "context": "drawio", "container": "drawio", "deployment": "drawio", "network": "drawio",
@@ -159,7 +160,17 @@ def main(argv: list[str] | None = None) -> int:
     doctor.set_defaults(func=_cmd_doctor)
 
     args = parser.parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (BackendMissing, RenderError, SpecError, PermissionError) as error:
+        # These carry the actionable text — the install command, the reason a
+        # hand-owned file was not overwritten, the invalid field. A traceback
+        # buries it.
+        print(f"{error}")
+        return 1
+    except FileNotFoundError as error:
+        print(f"not found: {error.filename or error}")
+        return 1
 
 
 if __name__ == "__main__":
