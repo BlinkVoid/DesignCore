@@ -122,6 +122,15 @@ Caveats for Task 11:
 - Shims must be installed **before** importing `@excalidraw/utils` (dynamic import).
 - Text elements load fonts through `document.fonts`/`FontFace`, which are stubbed here;
   text-bearing scenes need verification before the skill relies on them.
+  **RESOLVED 2026-08-17 (Task 9):** verified against real emitter output. A 9-element scene
+  with four text elements rendered every label correctly (`Alpha`, `the "Beta"`, `Gamma`,
+  `calls`) as real `<text>` nodes, and `check_svg_bounds` reports it clean. The stubs do emit
+  one non-fatal warning — `Couldn't transform font-face to css for family "undefined"` — and
+  the embedded font-face CSS is dropped, so text falls back to a system font. Geometry and
+  content are unaffected. Task 11 should suppress or tolerate that warning, not treat it as
+  a render failure.
+  Also settled here: label escaping needs no special handling in this emitter, because the
+  document is serialized with `json.dumps` (contrast amendment A8's DOT case).
 - SVG is proven; PNG would still need a rasterizer (not probed, not required for the vision
   pass if the PNG step is served by another tool).
 
