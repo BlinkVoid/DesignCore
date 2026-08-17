@@ -42,5 +42,12 @@ not use it for anything a reader might mistake for authoritative.
 `--format` overrides it: `designcore render <id> --format mermaid`.
 
 Renders are written to `out/<format>/`, so the same diagram can exist in more
-than one format without one overwriting another. The manifest records the
-format from the most recent render.
+than one format without one overwriting another. The manifest records one
+entry per `(id, format)` pair, so every format a diagram has been rendered as
+stays tracked.
+
+`designcore new` takes only `--kind`; the format belongs to the render, not to
+the spec, so pass `--format` to `designcore render`. If you re-render in a new
+format and no longer want the old one, delete its files — `designcore check`
+reports anything under `src/` or `out/` that no entry references as
+`ORPHANED_ARTIFACT`, but never deletes it for you.

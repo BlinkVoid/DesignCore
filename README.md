@@ -42,8 +42,10 @@ npm install --prefix src/designcore/render/js
 | `designcore check` | validate `diagrams.yaml` against what is on disk |
 | `designcore doctor` | report backend availability |
 
-`--root` points at the diagram directory (default `docs/diagrams`); `--format`
-overrides the default chosen from the spec's `kind`.
+`--root` points at the diagram directory (default `docs/diagrams`). `render`
+also takes `--format`, which overrides the default chosen from the spec's
+`kind`; renders land in `out/<format>/` and each format gets its own manifest
+entry, so one diagram can exist in several formats at once.
 
 ## Example
 
