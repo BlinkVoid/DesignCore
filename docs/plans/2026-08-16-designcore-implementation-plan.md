@@ -166,6 +166,28 @@ following amendments are **binding** and supersede the named task steps below.
   here, and JSON in Task 9, which needed nothing because `json.dumps` handles it). The
   general rule is that escaping must match the consumer, not the file format.
 
+## Execution amendments (2026-08-17, during Task 11)
+
+- **A11 (pins the Excalidraw helper's dependency):** `@excalidraw/utils` must be pinned to
+  the **exact** version `0.1.3-test32`. The Task 2 findings recorded the install as
+  `npm install @excalidraw/utils jsdom`, which at the time resolved to that prerelease. A
+  caret range does not match prereleases, so `^0.1.2` silently installs the latest *stable*
+  0.1.2 — which ships `dist/excalidraw-utils.min.js` and throws under the jsdom shim, while
+  0.1.3-test32 ships `dist/prod/index.js` and works. The first real render of the shipped
+  helper failed for exactly this reason.
+
+  `src/designcore/render/js/package.json` therefore pins the exact version and explains why
+  inline, and `package-lock.json` is committed. Depending on a prerelease is a known
+  fragility: if it is ever unpublished, `render_excalidraw` fails closed with
+  `BackendMissing`/`RenderError` rather than producing an unverified diagram, which is the
+  behaviour the global constraints require.
+
+- **A12 (improves A3's rasterization step):** the Chrome screenshot is passed
+  `--window-size` derived from the SVG's own `width`/`height` (falling back to its
+  `viewBox`, then 1200x800). Without it Chrome uses its default viewport and a small diagram
+  becomes a mostly-empty 800x600 PNG — dead weight in Task 14's vision pass. Verified: the
+  same scene went from a blank-padded default to a tight 364x58.
+
 ---
 
 ### Task 1: Repository scaffold and `designcore doctor`

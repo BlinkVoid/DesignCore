@@ -1,0 +1,18 @@
+{
+  "name": "designcore-excalidraw-export",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless Excalidraw SVG export helper for DesignCore.",
+  "comment": [
+    "@excalidraw/utils is pinned to an exact prerelease on purpose.",
+    "0.1.2 (the latest stable) ships dist/excalidraw-utils.min.js, which throws",
+    "under the jsdom shim; 0.1.3-test32 ships dist/prod/index.js, which is the",
+    "build the Task 2 probe verified. A caret range would silently select the",
+    "broken stable release, because npm ranges do not match prereleases."
+  ],
+  "dependencies": {
+    "@excalidraw/utils": "0.1.3-test32",
+    "jsdom": "^29.1.1"
+  }
+}

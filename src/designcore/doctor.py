@@ -44,7 +44,7 @@ BACKENDS: tuple[Backend, ...] = (
     Backend(
         name="node",
         command="node",
-        purpose="Run @drawio/mcp for Mermaid to mxGraph XML conversion",
+        purpose="Run the Excalidraw SVG export helper (jsdom + @excalidraw/utils)",
         install_hint="install Node.js 20+ (nvm install --lts)",
     ),
 )

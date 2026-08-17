@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Installed by `npm install --prefix src/designcore/render/js`; the exact tree
+# is pinned by package-lock.json, which is committed.
+node_modules/
