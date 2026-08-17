@@ -125,6 +125,31 @@ following amendments are **binding** and supersede the named task steps below.
   and XML respectively; both need their own escaping check, and XML needs `&`, `<`, `>` as
   well. Do not assume `_quote` covers them — it is DOT-specific.
 
+## Execution amendments (2026-08-17, during Task 8)
+
+- **A9 (fixes Task 8):** Task 8 Step 3's `check_svg_bounds` compares raw `x`/`y` attributes
+  against the root `viewBox`, ignoring SVG transforms. Every shape mmdc emits sits inside a
+  `<g transform="translate(...)">` and is centred on that origin, so its local `x` is always
+  negative — the check returned `CLIPPED_CONTENT` (severity **error**) for 100% of correct
+  mermaid renders. Under Task 13's pipeline that would have failed every diagram. It also
+  scanned only `<rect>`, while mermaid puts label text in `foreignObject` (the Task 6 probe
+  output has 3 `foreignObject` and 0 `<text>`), so it was blind to the truncated labels it
+  exists to catch.
+
+  `lint/geometry.py` now accumulates an affine transform (`translate`, `scale`, `matrix`,
+  `rotate`) down the tree and tests each element's four transformed corners against the
+  viewBox, with a 0.5px epsilon for rounding. `foreignObject` and `image` are checked
+  alongside `rect`. An unsupported transform (e.g. `skewX`) skips that subtree rather than
+  producing a fictional bound. User-approved 2026-08-17.
+
+  Verified on real mmdc output: the two Task 6 SVGs report clean, and the same content with
+  a deliberately shrunk viewBox still reports `CLIPPED_CONTENT`.
+
+  Reviewer's note: this is the second plan defect in a row (with A8) that only real rendered
+  input exposed, and both were invisible to the brief's own unit tests because those tests
+  used hand-written fixtures. Task 14's end-to-end verification should be treated as
+  load-bearing, not a formality.
+
 ---
 
 ### Task 1: Repository scaffold and `designcore doctor`
