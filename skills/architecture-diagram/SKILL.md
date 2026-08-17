@@ -26,8 +26,10 @@ Never mix altitudes. "What talks to what" and "where it runs" are different diag
 Follow [../_shared/references/pipeline.md](../_shared/references/pipeline.md) exactly.
 Judge the rendered PNG against [../_shared/references/legibility.md](../_shared/references/legibility.md).
 Choose the format with [../_shared/references/format-selection.md](../_shared/references/format-selection.md);
-architecture defaults to draw.io, but Mermaid is right for small in-repo diagrams.
-Format mechanics: [../_shared/references/drawio.md](../_shared/references/drawio.md).
+the format defaults to Excalidraw; ask for Mermaid when the diagram is going into a
+markdown file, and draw.io when a human will hand-edit it or it needs branded icons.
+Format mechanics: [../_shared/references/excalidraw.md](../_shared/references/excalidraw.md),
+[../_shared/references/drawio.md](../_shared/references/drawio.md).
 
 ## Hard rules
 

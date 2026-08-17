@@ -29,8 +29,10 @@ Discipline:
 Follow [../_shared/references/pipeline.md](../_shared/references/pipeline.md) exactly.
 Judge the rendered PNG against [../_shared/references/legibility.md](../_shared/references/legibility.md).
 Choose the format with [../_shared/references/format-selection.md](../_shared/references/format-selection.md);
-flows default to Mermaid, which diffs cleanly and renders natively in repo docs.
-Format mechanics: [../_shared/references/mermaid.md](../_shared/references/mermaid.md).
+the format defaults to Excalidraw; ask for Mermaid when the flow is going into a markdown
+file, where it diffs cleanly and renders natively.
+Format mechanics: [../_shared/references/excalidraw.md](../_shared/references/excalidraw.md),
+[../_shared/references/mermaid.md](../_shared/references/mermaid.md).
 
 ## Hard rules
 

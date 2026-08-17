@@ -23,7 +23,8 @@ Discipline:
 Follow [../_shared/references/pipeline.md](../_shared/references/pipeline.md) exactly.
 Judge the rendered PNG against [../_shared/references/legibility.md](../_shared/references/legibility.md).
 Choose the format with [../_shared/references/format-selection.md](../_shared/references/format-selection.md);
-concept sketches default to Excalidraw, whose hand-drawn look carries the informality.
+the format defaults to Excalidraw, which is what a sketch wants anyway; ask for Mermaid
+only when the sketch is going into a markdown file.
 Format mechanics: [../_shared/references/excalidraw.md](../_shared/references/excalidraw.md).
 
 ## Render status
