@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from designcore.render import BackendMissing, RenderError
-from designcore.spec import DiagramSpec
+from designcore.spec import DIRECTIONS, DiagramSpec
 
 DPI = 72.0
 INSTALL_HINT = "sudo apt install graphviz"
@@ -35,7 +35,10 @@ def _quote(value: str) -> str:
 
 
 def to_dot(spec: DiagramSpec) -> str:
-    rankdir = "LR" if spec.direction.upper() in {"LR", "RL"} else "TB"
+    # Passed through rather than folded to LR/TB: Graphviz supports all four,
+    # and Mermaid honours RL/BT, so collapsing them here would lay the same
+    # spec out in opposite directions depending on the output format.
+    rankdir = spec.direction.upper() if spec.direction.upper() in DIRECTIONS else "TB"
     lines = [f"digraph {spec.id.replace('-', '_')} {{", f"  rankdir={rankdir};", "  node [shape=box];"]
     grouped = {m for g in spec.groups for m in g.members}
 

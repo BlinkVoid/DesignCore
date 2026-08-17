@@ -13,6 +13,10 @@ KINDS = frozenset(
 ROLES = frozenset({"actor", "service", "store", "infra", "external", "note"})
 EMPHASES = frozenset({"normal", "primary", "muted"})
 EDGE_KINDS = frozenset({"sync", "async", "data", "dashed"})
+# Reaches Mermaid's `flowchart <direction>` header and Graphviz's rankdir
+# verbatim, so an unvalidated typo surfaces as a render-time parse failure
+# rather than a SpecError here.
+DIRECTIONS = frozenset({"TB", "BT", "LR", "RL"})
 GEOMETRY_KEYS = frozenset({"x", "y", "width", "height", "position"})
 
 
@@ -129,7 +133,7 @@ def parse_spec(data: dict) -> DiagramSpec:
         title=title,
         kind=kind,
         question=question,
-        direction=str(data.get("direction", "TB")),
+        direction=_one_of(str(data.get("direction", "TB")).upper(), DIRECTIONS, "direction"),
         nodes=tuple(nodes),
         edges=tuple(edges),
         groups=tuple(groups),

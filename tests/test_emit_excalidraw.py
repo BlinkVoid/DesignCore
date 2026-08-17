@@ -55,3 +55,37 @@ def test_primary_emphasis_gets_a_thicker_stroke():
 def test_missing_placement_is_an_error_not_a_guess():
     with pytest.raises(KeyError):
         emit_excalidraw(SPEC, {"a": PLACEMENTS["a"]})
+
+
+def _arrow(direction: str, placements: dict) -> dict:
+    spec = DiagramSpec(
+        id="d", title="T", kind="concept", question="Q?", direction=direction,
+        nodes=(Node(id="a", label="A"), Node(id="b", label="B")),
+        edges=(Edge(source="a", target="b"),),
+    )
+    return next(e for e in emit_excalidraw(spec, placements)["elements"] if e["type"] == "arrow")
+
+
+def test_vertical_layout_arrow_runs_downward_not_backwards():
+    """TB is the spec default and what `designcore new` scaffolds, and
+    excalidraw is the default format for kind: concept -- so a hardcoded
+    left-to-right exit point breaks the default path for this emitter.
+    """
+    arrow = _arrow("TB", {"a": Placement("a", 0, 0, 54, 36), "b": Placement("b", 0, 72, 54, 36)})
+    assert arrow["width"] == 0          # straight down, not diagonally backwards
+    assert arrow["height"] > 0
+    assert arrow["y"] == 36             # leaves the bottom edge of a
+    assert arrow["points"][-1] == [0, 36]  # to the top edge of b
+
+
+def test_horizontal_layout_arrow_still_runs_rightward():
+    arrow = _arrow("LR", {"a": Placement("a", 0, 0, 100, 50), "b": Placement("b", 200, 0, 100, 50)})
+    assert arrow["x"] == 100            # leaves the right edge of a
+    assert arrow["width"] == 100        # to the left edge of b
+    assert arrow["height"] == 0
+
+
+def test_upward_layout_arrow_runs_upward():
+    arrow = _arrow("BT", {"a": Placement("a", 0, 72, 54, 36), "b": Placement("b", 0, 0, 54, 36)})
+    assert arrow["y"] == 72             # leaves the top edge of a
+    assert arrow["points"][-1] == [0, -36]

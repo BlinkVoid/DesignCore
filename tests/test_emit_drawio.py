@@ -127,3 +127,18 @@ def test_edge_labels_are_html_escaped_too():
 def test_missing_placement_is_an_error_not_a_guess():
     with pytest.raises(KeyError):
         emit_drawio(SPEC, {"a": PLACEMENTS["a"]})
+
+
+def test_group_cells_declare_html_so_their_labels_are_not_double_escaped():
+    """Group labels go through the same HTML escaping as nodes and edges, so
+    the group style must also declare html=1 or draw.io shows the entities
+    literally ('Prod &amp; Staging')."""
+    spec = DiagramSpec(
+        id="d", title="T", kind="container", question="Q?",
+        nodes=(Node(id="a", label="A"),), edges=(),
+        groups=(Group(id="g", label="Prod & Staging", members=("a",)),),
+    )
+    xml = emit_drawio(spec, {"a": Placement("a", 0, 0, 10, 10)}, {"g": Placement("g", 0, 0, 50, 50)})
+    cells = _cells(xml)
+    assert "html=1" in cells["g"].get("style")
+    assert cells["g"].get("value") == "Prod &amp; Staging"

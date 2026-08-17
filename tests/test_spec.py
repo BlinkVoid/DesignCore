@@ -73,3 +73,18 @@ def test_rejects_coordinates_in_the_spec():
 def test_rejects_unknown_kind():
     with pytest.raises(SpecError, match="kind"):
         parse_spec({**VALID, "kind": "interpretive-dance"})
+
+
+def test_rejects_an_unknown_direction():
+    """direction reaches Mermaid's header and Graphviz's rankdir verbatim, so a
+    typo becomes a render-time parse error instead of a spec error."""
+    with pytest.raises(SpecError, match="direction"):
+        parse_spec({"id": "d", "title": "T", "kind": "flow", "question": "Q?", "direction": "LTR"})
+
+
+def test_accepts_all_four_directions():
+    for direction in ("TB", "BT", "LR", "RL"):
+        spec = parse_spec(
+            {"id": "d", "title": "T", "kind": "flow", "question": "Q?", "direction": direction}
+        )
+        assert spec.direction == direction

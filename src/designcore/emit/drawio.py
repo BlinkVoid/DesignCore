@@ -33,7 +33,10 @@ EDGE_STYLE = {
     "data": "edgeStyle=orthogonalEdgeStyle;html=1;strokeWidth=2;",
     "dashed": "edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;",
 }
-GROUP_STYLE = "rounded=0;dashed=1;fillColor=none;verticalAlign=top;align=left;spacing=8;"
+# html=1 matters as much here as on nodes and edges: group labels go through
+# the same _label() escaping, so without it draw.io renders the entities
+# literally ("Prod &amp; Staging").
+GROUP_STYLE = "rounded=0;html=1;dashed=1;fillColor=none;verticalAlign=top;align=left;spacing=8;"
 
 ROOT_ID = "1"
 

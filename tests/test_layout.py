@@ -132,3 +132,14 @@ def test_labelled_edges_get_more_separation_than_unlabelled_ones():
         return p["b"].x - (p["a"].x + p["a"].width)
 
     assert _gap(_spec("a long edge label")) > _gap(_spec(""))
+
+
+def test_all_four_directions_reach_rankdir_unfolded():
+    """RL and BT must not collapse to LR/TB: Mermaid honours them, so folding
+    them here makes one spec lay out differently per format."""
+    for direction in ("TB", "BT", "LR", "RL"):
+        spec = DiagramSpec(
+            id="d", title="T", kind="flow", question="Q?", direction=direction,
+            nodes=(Node(id="a", label="A"),), edges=(),
+        )
+        assert f"rankdir={direction};" in to_dot(spec)
