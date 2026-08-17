@@ -87,19 +87,82 @@ def _canvas_height(data: dict) -> float:
     return float(data["bb"].split(",")[3])
 
 
+Route = tuple[tuple[float, float], ...]
+
+
 def layout_all(
     spec: DiagramSpec,
     run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
     which: Callable[[str], str | None] = shutil.which,
-) -> tuple[dict[str, Placement], dict[str, Placement]]:
-    """Return (node placements, group boxes) from a single Graphviz run.
+) -> tuple[dict[str, Placement], dict[str, Placement], dict[tuple[str, str], Route]]:
+    """Return (node placements, group boxes, edge routes) from one Graphviz run.
 
-    Callers needing both -- the drawio emitter does -- should use this rather
-    than calling layout_spec and layout_groups separately: one dot invocation
-    instead of two, and the two results provably describe the same layout.
+    Callers needing more than one -- the drawio and excalidraw emitters do --
+    should use this rather than calling the individual functions: one dot
+    invocation instead of three, and the results provably describe the same
+    layout.
     """
     data = _run_dot(spec, run, which)
-    return _placements(spec, data), _group_boxes(spec, data)
+    return _placements(spec, data), _group_boxes(spec, data), _edge_routes(data)
+
+
+def layout_edges(
+    spec: DiagramSpec,
+    run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+    which: Callable[[str], str | None] = shutil.which,
+) -> dict[tuple[str, str], Route]:
+    """Return each edge's routed path, keyed by (source, target).
+
+    Graphviz routes every edge as a bezier that avoids the nodes in its way.
+    Throwing that away leaves emitters drawing straight point-to-point lines
+    that cut through whatever sits between the endpoints.
+    """
+    return _edge_routes(_run_dot(spec, run, which))
+
+
+def _edge_routes(data: dict) -> dict[tuple[str, str], Route]:
+    canvas_height = _canvas_height(data)
+    names = {
+        obj.get("_gvid"): obj.get("name", "")
+        for obj in data.get("objects", [])
+        if "_gvid" in obj
+    }
+
+    routes: dict[tuple[str, str], Route] = {}
+    for edge in data.get("edges", []):
+        source, target = names.get(edge.get("tail")), names.get(edge.get("head"))
+        position = edge.get("pos")
+        if not source or not target or not position:
+            continue
+        key = (source, target)
+        if key in routes:
+            continue  # parallel edges share a route; the first one wins
+        routes[key] = _parse_spline(position, canvas_height)
+    return routes
+
+
+def _parse_spline(position: str, canvas_height: float) -> Route:
+    """Parse Graphviz's spline syntax into top-left pixel points.
+
+    The form is `e,<tip> <p0> <p1> ...`: the `e,` token is the arrowhead tip
+    and belongs at the end of the path, not the start where it is written.
+    """
+    tip: tuple[float, float] | None = None
+    points: list[tuple[float, float]] = []
+    for token in position.split():
+        prefix, _, raw = token.partition(",") if token[:2] in ("e,", "s,") else ("", "", token)
+        try:
+            x_text, y_text = (raw or token).split(",")
+            point = (float(x_text), canvas_height - float(y_text))
+        except ValueError:
+            continue
+        if prefix == "e":
+            tip = point
+        elif prefix != "s":
+            points.append(point)
+    if tip is not None:
+        points.append(tip)
+    return tuple(points)
 
 
 def layout_spec(

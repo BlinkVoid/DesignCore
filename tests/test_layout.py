@@ -3,7 +3,9 @@ import subprocess
 
 import pytest
 
-from designcore.layout import Placement, layout_all, layout_groups, layout_spec, to_dot
+from designcore.layout import (
+    Placement, layout_all, layout_edges, layout_groups, layout_spec, to_dot,
+)
 from designcore.render import BackendMissing
 from designcore.spec import DiagramSpec, Edge, Group, Node
 
@@ -155,7 +157,44 @@ def test_placements_and_group_boxes_come_from_one_dot_run():
         calls.append(cmd)
         return subprocess.CompletedProcess(cmd, 0, stdout=FAKE_JSON, stderr="")
 
-    nodes, groups = layout_all(SPEC, run=counting_run, which=lambda c: "/usr/bin/dot")
+    nodes, groups, _routes = layout_all(SPEC, run=counting_run, which=lambda c: "/usr/bin/dot")
     assert len(calls) == 1
     assert set(nodes) == {"a", "b"}
     assert set(groups) == {"g"}
+
+
+ROUTED_JSON = json.dumps({
+    "bb": "0,0,200,100",
+    "objects": [
+        {"_gvid": 0, "name": "a", "pos": "50,80", "width": "1.0", "height": "0.5"},
+        {"_gvid": 1, "name": "b", "pos": "150,20", "width": "1.0", "height": "0.5"},
+    ],
+    "edges": [
+        {"_gvid": 0, "tail": 0, "head": 1, "pos": "e,140,30 60,70 90,60 120,40"},
+    ],
+})
+
+
+def test_edge_routes_are_extracted_in_top_left_pixels():
+    """Graphviz routes every edge as a bezier; discarding it forces emitters
+    to draw straight lines that cut through whatever is in the way."""
+    def run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 0, stdout=ROUTED_JSON, stderr="")
+
+    routes = layout_edges(SPEC, run=run, which=lambda c: "/usr/bin/dot")
+    points = routes[("a", "b")]
+    assert points[0] == (60.0, 30.0)      # first control point, y flipped
+    assert points[-1] == (140.0, 70.0)    # the 'e,' arrowhead tip, y flipped
+    assert len(points) == 4
+
+
+def test_layout_all_returns_routes_from_the_same_dot_run():
+    calls: list = []
+
+    def run(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout=ROUTED_JSON, stderr="")
+
+    nodes, groups, routes = layout_all(SPEC, run=run, which=lambda c: "/usr/bin/dot")
+    assert len(calls) == 1
+    assert ("a", "b") in routes

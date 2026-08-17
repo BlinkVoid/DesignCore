@@ -41,6 +41,7 @@ class Deps:
     render_map: dict[str, Callable[[Path, Path], list[Path]]]
     layout: Callable[[DiagramSpec], dict[str, Placement]]
     layout_groups: Callable[[DiagramSpec], dict[str, Placement]]
+    layout_edges: Callable[[DiagramSpec], dict] | None = None
 
     @classmethod
     def default(cls) -> "Deps":
@@ -49,7 +50,7 @@ class Deps:
         # and the two results provably describe the same layout. DiagramSpec
         # is a frozen dataclass of tuples, so it is hashable as a cache key.
         @lru_cache(maxsize=1)
-        def _layout_both(spec: DiagramSpec) -> tuple[dict, dict]:
+        def _layout_both(spec: DiagramSpec) -> tuple[dict, dict, dict]:
             return layout_all(spec)
 
         return cls(
@@ -60,6 +61,7 @@ class Deps:
             },
             layout=lambda spec: _layout_both(spec)[0],
             layout_groups=lambda spec: _layout_both(spec)[1],
+            layout_edges=lambda spec: _layout_both(spec)[2],
         )
 
 
@@ -69,7 +71,8 @@ def _source_text(spec: DiagramSpec, fmt: str, deps: Deps) -> str:
     if fmt == "drawio":
         return emit_drawio(spec, deps.layout(spec), deps.layout_groups(spec))
     if fmt == "excalidraw":
-        return json.dumps(emit_excalidraw(spec, deps.layout(spec)), indent=2)
+        routes = deps.layout_edges(spec) if deps.layout_edges else None
+        return json.dumps(emit_excalidraw(spec, deps.layout(spec), routes), indent=2)
     raise ValueError(f"unknown format {fmt!r}; expected one of {sorted(SUFFIXES)}")
 
 

@@ -184,3 +184,41 @@ def test_external_role_is_drawn_dashed_and_unfilled():
     rect = _rects(spec, placements)[0]
     assert rect["strokeStyle"] == "dashed"
     assert rect["backgroundColor"] == "transparent"
+
+
+def test_arrow_follows_the_graphviz_route_when_one_is_given():
+    """A straight point-to-point arrow cuts through whatever sits between the
+    endpoints; Graphviz already routed a path around it."""
+    spec = DiagramSpec(
+        id="d", title="T", kind="concept", question="Q?", direction="TB",
+        nodes=(Node(id="a", label="A"), Node(id="b", label="B")),
+        edges=(Edge(source="a", target="b"),),
+    )
+    placements = {"a": Placement("a", 0, 0, 60, 30), "b": Placement("b", 0, 120, 60, 30)}
+    routes = {("a", "b"): ((30.0, 30.0), (80.0, 60.0), (80.0, 90.0), (30.0, 120.0))}
+    arrow = next(
+        e for e in emit_excalidraw(spec, placements, routes)["elements"] if e["type"] == "arrow"
+    )
+    assert arrow["x"] == 30.0 and arrow["y"] == 30.0
+    assert arrow["points"] == [[0.0, 0.0], [50.0, 30.0], [50.0, 60.0], [0.0, 90.0]]
+    assert arrow["roundness"] == {"type": 2}   # smooth the routed path
+
+
+def test_arrow_falls_back_to_straight_when_no_route_exists():
+    arrow = _arrow("LR", {"a": Placement("a", 0, 0, 100, 50), "b": Placement("b", 200, 0, 100, 50)})
+    assert arrow["points"] == [[0, 0], [100, 0]]
+
+
+def test_routed_arrow_still_binds_to_its_endpoints():
+    spec = DiagramSpec(
+        id="d", title="T", kind="concept", question="Q?", direction="TB",
+        nodes=(Node(id="a", label="A"), Node(id="b", label="B")),
+        edges=(Edge(source="a", target="b"),),
+    )
+    placements = {"a": Placement("a", 0, 0, 60, 30), "b": Placement("b", 0, 120, 60, 30)}
+    routes = {("a", "b"): ((30.0, 30.0), (30.0, 120.0))}
+    arrow = next(
+        e for e in emit_excalidraw(spec, placements, routes)["elements"] if e["type"] == "arrow"
+    )
+    assert arrow["startBinding"]["elementId"] == "a"
+    assert arrow["endBinding"]["elementId"] == "b"

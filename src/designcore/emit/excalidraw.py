@@ -109,7 +109,11 @@ def _connection_points(
     return (start_cx, start.y), (end_cx, end.y + end.height)
 
 
-def emit_excalidraw(spec: DiagramSpec, placements: dict[str, Placement]) -> dict[str, Any]:
+def emit_excalidraw(
+    spec: DiagramSpec,
+    placements: dict[str, Placement],
+    routes: dict[tuple[str, str], tuple[tuple[float, float], ...]] | None = None,
+) -> dict[str, Any]:
     elements: list[dict[str, Any]] = []
 
     for node in spec.nodes:
@@ -137,11 +141,25 @@ def emit_excalidraw(spec: DiagramSpec, placements: dict[str, Placement]) -> dict
 
     for index, edge in enumerate(spec.edges):
         start, end = placements[edge.source], placements[edge.target]
-        (x1, y1), (x2, y2) = _connection_points(start, end)
+        route = (routes or {}).get((edge.source, edge.target))
+
+        if route and len(route) >= 2:
+            # Graphviz already routed this edge around whatever is in the way;
+            # following it beats a straight line through the obstacles.
+            (x1, y1), (x2, y2) = route[0], route[-1]
+            points = [[px - x1, py - y1] for px, py in route]
+        else:
+            (x1, y1), (x2, y2) = _connection_points(start, end)
+            points = [[0, 0], [x2 - x1, y2 - y1]]
+
         arrow = _base(f"edge-{index}", x1, y1, x2 - x1, y2 - y1)
         arrow["type"] = "arrow"
-        arrow["points"] = [[0, 0], [x2 - x1, y2 - y1]]
+        arrow["points"] = points
+        if route and len(route) > 2:
+            arrow["roundness"] = {"type": 2}  # smooth the bezier, not a polyline
         arrow["strokeStyle"] = "dashed" if edge.kind in {"async", "dashed"} else "solid"
+        arrow["startArrowhead"] = None
+        arrow["endArrowhead"] = "arrow"
         arrow["startBinding"] = {"elementId": edge.source, "focus": 0, "gap": 4}
         arrow["endBinding"] = {"elementId": edge.target, "focus": 0, "gap": 4}
         elements.append(arrow)
