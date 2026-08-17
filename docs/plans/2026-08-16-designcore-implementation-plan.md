@@ -150,6 +150,22 @@ following amendments are **binding** and supersede the named task steps below.
   used hand-written fixtures. Task 14's end-to-end verification should be treated as
   load-bearing, not a formality.
 
+## Execution amendments (2026-08-17, during Task 10)
+
+- **A10 (extends A8 to the drawio emitter):** `emit/drawio.py` builds its document with
+  `ElementTree`, so XML escaping is correct by construction. That is necessary but not
+  sufficient: every cell we emit carries `html=1`, so draw.io parses the *value* as HTML.
+  A real CLI render of the label `A & B <fast>` produced well-formed XML and a picture
+  reading `A & B` -- `<fast>` was silently swallowed as an unknown HTML tag.
+
+  Labels are therefore HTML-escaped (`_label()`) before ElementTree escapes them for XML,
+  so the file holds `&amp;lt;fast&amp;gt;` and draw.io renders a literal `<fast>`. Verified
+  by re-rendering through `xvfb-run -a drawio -x`.
+
+  Note for reviewers: this is a *third* distinct escaping context (DOT in A8, HTML-in-XML
+  here, and JSON in Task 9, which needed nothing because `json.dumps` handles it). The
+  general rule is that escaping must match the consumer, not the file format.
+
 ---
 
 ### Task 1: Repository scaffold and `designcore doctor`
