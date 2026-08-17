@@ -188,6 +188,31 @@ following amendments are **binding** and supersede the named task steps below.
   becomes a mostly-empty 800x600 PNG — dead weight in Task 14's vision pass. Verified: the
   same scene went from a blank-padded default to a tight 364x58.
 
+## Execution amendments (2026-08-17, during Tasks 13-14)
+
+- **A13 (amends Task 13):** renders go to `out/<format>/`, not `out/`. Every renderer names
+  its output from the source stem, which is the diagram id in all three formats, so a shared
+  `out/` meant the second format silently overwrote the first -- and Task 14 Step 4 asks for
+  all three formats side by side. `cli._rendered_svg` resolves the render through the
+  manifest's recorded format (falling back to the kind default, then any present); without
+  that, `lint` looked in the old location, skipped `check_svg_bounds` entirely, and reported
+  a clipped diagram as clean.
+
+- **A14 (amends Task 8's `check_geometry`):** overlap and off-canvas comparisons take the
+  same 0.5px epsilon that A9 introduced for SVG bounds. Graphviz reports node *centres*, so
+  `x = cx - width/2` accumulates float error: the Task 14 example put node `spec` at
+  `x=-0.001` and the end-to-end test failed with `OFF_CANVAS` on a perfectly correct diagram.
+
+- **A15 (amends Task 7's `to_dot`):** edge labels are declared in the DOT source. Graphviz
+  reserves rank separation for a labelled edge only if it knows the label; emitting bare
+  `"a" -> "b"` laid adjacent nodes close enough that draw.io's opaque edge label covered the
+  arrow completely. The first drawio render of the Task 14 example had **two edges with no
+  visible line at all** -- well-formed XML, correct cells, invisible arrows. Only Step 5's
+  look-at-the-picture check caught it.
+
+  This is the strongest argument yet for that step: the XML was right, the SVG contained the
+  edge paths, the lint was clean, and the diagram was still wrong.
+
 ---
 
 ### Task 1: Repository scaffold and `designcore doctor`

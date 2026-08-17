@@ -52,7 +52,12 @@ def to_dot(spec: DiagramSpec) -> str:
             lines.append(f'  "{_quote(node.id)}" [label="{_quote(node.label)}"];')
 
     for edge in spec.edges:
-        lines.append(f'  "{_quote(edge.source)}" -> "{_quote(edge.target)}";')
+        # The label is declared so Graphviz reserves rank separation for it.
+        # Without it adjacent nodes sit close enough that a renderer's opaque
+        # edge label covers the arrow completely -- the drawio export of the
+        # Task 14 example had two edges with no visible line at all.
+        attributes = f' [label="{_quote(edge.label)}"]' if edge.label else ""
+        lines.append(f'  "{_quote(edge.source)}" -> "{_quote(edge.target)}"{attributes};')
 
     lines.append("}")
     return "\n".join(lines) + "\n"

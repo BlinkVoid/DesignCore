@@ -66,12 +66,36 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _rendered_svg(root: Path, spec_id: str, kind: str) -> Path | None:
+    """Locate a diagram's rendered SVG, which lives under out/<format>/.
+
+    Prefers the format the manifest records; falls back to the kind's default
+    and then to any format present, so lint still inspects the render after a
+    format change.
+    """
+    manifest_path = root / "diagrams.yaml"
+    candidates: list[str] = []
+    if manifest_path.exists():
+        entry = next(
+            (d for d in load_manifest(manifest_path).diagrams if d.id == spec_id), None
+        )
+        if entry is not None:
+            candidates.append(entry.format)
+    candidates.append(DEFAULT_FORMAT[kind])
+    candidates.extend(f for f in DEFAULT_FORMAT.values() if f not in candidates)
+
+    for fmt in candidates:
+        svg = root / "out" / fmt / f"{spec_id}.svg"
+        if svg.exists():
+            return svg
+    return None
+
+
 def _cmd_lint(args: argparse.Namespace) -> int:
     root = Path(args.root)
     spec = load_spec(root / "src" / f"{args.id}.spec.yaml")
     placements = Deps.default().layout(spec) if spec.nodes else {}
-    svg = root / "out" / f"{args.id}.svg"
-    findings = lint_diagram(spec, placements, svg if svg.exists() else None)
+    findings = lint_diagram(spec, placements, _rendered_svg(root, args.id, spec.kind))
     if not findings:
         print(f"{args.id}: clean")
         return 0

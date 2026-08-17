@@ -1,0 +1,16 @@
+version: 1
+diagrams:
+- id: designcore-pipeline
+  title: DesignCore compile pipeline
+  kind: flow
+  format: excalidraw
+  question: How does a graph spec become a verified diagram?
+  spec: src/designcore-pipeline.spec.yaml
+  source: src/designcore-pipeline.excalidraw
+  rendered:
+  - out/excalidraw/designcore-pipeline.svg
+  - out/excalidraw/designcore-pipeline.png
+  embedded_in: []
+  hand_owned: false
+  generated_by: designcore
+  generated_at: '2026-08-17'

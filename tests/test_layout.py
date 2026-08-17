@@ -104,3 +104,31 @@ def test_backslashes_in_labels_are_escaped_for_dot():
         edges=(),
     )
     assert r'label="C:\\path"' in to_dot(spec)
+
+
+def test_edge_labels_reach_the_dot_source():
+    """Graphviz reserves rank separation for labelled edges, but only if the
+    label is declared. Omitting it lays nodes out too close together, and a
+    downstream renderer's opaque label then covers the whole arrow.
+    """
+    spec = DiagramSpec(
+        id="d", title="T", kind="flow", question="Q?", direction="LR",
+        nodes=(Node(id="a", label="A"), Node(id="b", label="B")),
+        edges=(Edge(source="a", target="b", label="source file"),),
+    )
+    assert '"a" -> "b" [label="source file"]' in to_dot(spec)
+
+
+def test_labelled_edges_get_more_separation_than_unlabelled_ones():
+    def _spec(label: str):
+        return DiagramSpec(
+            id="d", title="T", kind="flow", question="Q?", direction="LR",
+            nodes=(Node(id="a", label="A"), Node(id="b", label="B")),
+            edges=(Edge(source="a", target="b", label=label),),
+        )
+
+    def _gap(spec):
+        p = layout_spec(spec)
+        return p["b"].x - (p["a"].x + p["a"].width)
+
+    assert _gap(_spec("a long edge label")) > _gap(_spec(""))

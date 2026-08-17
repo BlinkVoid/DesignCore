@@ -49,3 +49,26 @@ def test_unknown_command_is_rejected(capsys):
         main(["frobnicate"])
     except SystemExit as exc:
         assert exc.code != 0
+
+
+def test_lint_finds_the_render_in_its_format_directory(tmp_path):
+    """Renders live in out/<format>/; looking in out/ skips check_svg_bounds
+    entirely and reports a clipped diagram as clean."""
+    spec = tmp_path / "src" / "d.spec.yaml"
+    spec.parent.mkdir(parents=True)
+    spec.write_text(
+        yaml.safe_dump({
+            "id": "d", "title": "T", "kind": "flow", "question": "Q?",
+            "nodes": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}],
+            "edges": [{"from": "a", "to": "b"}],
+        }),
+        encoding="utf-8",
+    )
+    rendered = tmp_path / "out" / "mermaid" / "d.svg"
+    rendered.parent.mkdir(parents=True)
+    rendered.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+        '<rect x="10" y="10" width="500" height="50"/></svg>',
+        encoding="utf-8",
+    )
+    assert main(["lint", "d", "--root", str(tmp_path)]) == 1

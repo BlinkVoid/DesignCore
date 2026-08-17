@@ -30,10 +30,10 @@ _TRANSFORM_RE = re.compile(r"(\w+)\s*\(([^)]*)\)")
 
 def _overlaps(a: Placement, b: Placement) -> bool:
     return (
-        a.x < b.x + b.width
-        and b.x < a.x + a.width
-        and a.y < b.y + b.height
-        and b.y < a.y + a.height
+        a.x + EPSILON < b.x + b.width
+        and b.x + EPSILON < a.x + a.width
+        and a.y + EPSILON < b.y + b.height
+        and b.y + EPSILON < a.y + a.height
     )
 
 
@@ -54,10 +54,17 @@ def check_geometry(
             )
 
     for box in placements:
-        outside = box.x < 0 or box.y < 0
+        # Graphviz reports node centres, so x = cx - width/2 lands a fraction
+        # either side of zero. Without tolerance a node flush with the canvas
+        # edge (x=-0.001) is reported off-canvas and fails a correct diagram.
+        outside = box.x < -EPSILON or box.y < -EPSILON
         if canvas is not None:
             width, height = canvas
-            outside = outside or box.x + box.width > width or box.y + box.height > height
+            outside = (
+                outside
+                or box.x + box.width > width + EPSILON
+                or box.y + box.height > height + EPSILON
+            )
         if outside:
             findings.append(
                 Finding(

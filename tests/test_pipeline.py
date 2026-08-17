@@ -78,3 +78,18 @@ def test_lint_diagram_combines_all_three_check_families(tmp_path):
     placements = {"a": Placement("a", 0, 0, 100, 50), "b": Placement("b", 50, 0, 100, 50)}
     codes = {f.code for f in lint_diagram(SPEC, placements, svg)}
     assert "NODE_OVERLAP" in codes
+
+
+def test_formats_render_into_separate_directories(tmp_path):
+    """Two formats of one diagram must not overwrite each other's renders.
+
+    Renderers name their output from the source stem, which is the diagram id
+    for every format, so a shared out/ directory silently clobbers.
+    """
+    deps = _deps(tmp_path)
+    mermaid = compile_diagram(SPEC, "mermaid", tmp_path, deps)
+    drawio = compile_diagram(SPEC, "drawio", tmp_path, deps)
+
+    assert set(mermaid.rendered).isdisjoint(drawio.rendered)
+    assert all((tmp_path / r).exists() for r in mermaid.rendered)
+    assert all((tmp_path / r).exists() for r in drawio.rendered)

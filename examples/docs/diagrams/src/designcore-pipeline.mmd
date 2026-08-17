@@ -1,0 +1,15 @@
+flowchart LR
+    spec[".spec.yaml"]
+    emit["Emitter"]
+    layout["Graphviz"]
+    render["Renderer"]
+    lint["Lint"]
+    manifest["diagrams.yaml"]
+    spec --> emit
+    layout -->|geometry| emit
+    emit -->|source file| render
+    render -->|svg + png| lint
+    lint -->|entry| manifest
+    class lint primary
+    classDef primary stroke-width:3px
+    classDef muted opacity:0.55

@@ -112,3 +112,26 @@ def test_real_mermaid_output_structure_is_clean(tmp_path):
         view_box="0 0 207.34375 70",
     )
     assert check_svg_bounds(svg) == []
+
+
+def test_subpixel_negative_coordinate_is_not_off_canvas():
+    """Graphviz reports centres, so x = cx - width/2 accumulates float error.
+
+    A node flush with the canvas edge comes back as x=-0.001 and must not be
+    reported as off-canvas -- that fails the pipeline on a correct diagram.
+    """
+    assert check_geometry([Placement("a", -0.001, 0.0, 92.0, 36.0)]) == []
+
+
+def test_a_real_negative_coordinate_is_still_off_canvas():
+    assert [f.code for f in check_geometry([Placement("a", -5, 0, 92, 36)])] == ["OFF_CANVAS"]
+
+
+def test_subpixel_canvas_overflow_is_tolerated():
+    findings = check_geometry([Placement("a", 0, 0, 100.002, 50)], canvas=(100, 200))
+    assert findings == []
+
+
+def test_subpixel_overlap_is_not_an_overlap():
+    boxes = [Placement("a", 0, 0, 100.001, 50), Placement("b", 100, 0, 100, 50)]
+    assert check_geometry(boxes) == []

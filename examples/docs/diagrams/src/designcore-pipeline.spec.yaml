@@ -1,0 +1,40 @@
+id: designcore-pipeline
+title: DesignCore compile pipeline
+kind: flow
+question: "How does a graph spec become a verified diagram?"
+direction: LR
+nodes:
+  - id: spec
+    label: .spec.yaml
+    role: store
+  - id: emit
+    label: Emitter
+    role: service
+  - id: layout
+    label: Graphviz
+    role: infra
+  - id: render
+    label: Renderer
+    role: service
+  - id: lint
+    label: Lint
+    role: service
+    emphasis: primary
+  - id: manifest
+    label: diagrams.yaml
+    role: store
+edges:
+  - from: spec
+    to: emit
+  - from: layout
+    to: emit
+    label: geometry
+  - from: emit
+    to: render
+    label: source file
+  - from: render
+    to: lint
+    label: svg + png
+  - from: lint
+    to: manifest
+    label: entry

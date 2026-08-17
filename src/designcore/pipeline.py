@@ -79,7 +79,10 @@ def compile_diagram(
     source_path.parent.mkdir(parents=True, exist_ok=True)
     source_path.write_text(_source_text(spec, fmt, deps), encoding="utf-8")
 
-    rendered = deps.render_map[fmt](source_path, out_root / "out")
+    # Per-format output directory: every renderer names its output from the
+    # source stem, which is the diagram id in all three formats, so a shared
+    # out/ makes the second render silently clobber the first.
+    rendered = deps.render_map[fmt](source_path, out_root / "out" / fmt)
 
     return DiagramEntry(
         id=spec.id,
