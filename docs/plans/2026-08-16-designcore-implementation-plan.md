@@ -87,6 +87,27 @@ following amendments are **binding** and supersede the named task steps below.
   available for branded icons; hand-edits to a compiled `.drawio` require
   `hand_owned: true` in the manifest.
 
+## Execution amendments (2026-08-17, during Task 6)
+
+- **A7 (amends Task 6, informs Task 11):** Task 6 Step 4's `render_mermaid` is amended: mmdc
+  must be invoked with `-p <puppeteer config>`. The bundled Chromium cannot start on this
+  machine — `kernel.apparmor_restrict_unprivileged_userns=1` and no sudo — and aborts with
+  "No usable sandbox!" before writing anything, so the task's Step 6 verification failed as
+  originally specified.
+
+  `render/mermaid.py` gains `puppeteer_config(which)`: it prefers a system browser
+  (`google-chrome`, `chromium`, `chromium-browser`) passed as `executablePath`, which keeps
+  the Chromium sandbox **on** because those builds ship a setuid helper and an AppArmor
+  profile; it falls back to `{"args": ["--no-sandbox", ...]}` only when no system browser
+  exists. The config is written to a temp file and removed after rendering. User-approved
+  2026-08-17. Evidence: `docs/plans/2026-08-16-render-backend-findings.md` §3b.
+
+  Task 11's Chrome PNG rasterization (R2) must use the system `/usr/bin/google-chrome` for
+  the same reason, not a puppeteer-bundled Chromium.
+
+  This also corrects a Task 2 gap: `doctor` proves a backend is **on PATH**, never that it can
+  render. Task 14's end-to-end verification is the first place that distinction is enforced.
+
 ---
 
 ### Task 1: Repository scaffold and `designcore doctor`

@@ -130,11 +130,49 @@ fallback (lint-only excalidraw) is **not** triggered.
 
 ---
 
+## 3b. Late finding (2026-08-17, Task 6): mermaid-cli's bundled Chromium cannot start
+
+**Verdict: works with workaround (point puppeteer at a system browser).**
+
+Task 2 recorded `mmdc` as `ok` on the strength of `doctor`'s PATH check. That check proves the
+binary exists, not that it can render. The first real invocation in Task 6 failed:
+
+```
+[FATAL:zygote_host_impl_linux.cc:129] No usable sandbox! If you are running on Ubuntu 23.10+
+or another Linux distro that has disabled unprivileged user namespaces with AppArmor ...
+```
+
+`kernel.apparmor_restrict_unprivileged_userns` is `1` on this machine and sudo is unavailable
+(same constraint as R3), so the sysctl cannot be relaxed.
+
+| Invocation | Exit | Result |
+|---|---|---|
+| `mmdc -i real.mmd -o real.svg -b transparent` | 1 | `No usable sandbox!` — nothing written |
+| `... -p '{"args":["--no-sandbox"]}'` | 0 | valid SVG, 10803 bytes — but sandbox disabled |
+| `... -p '{"executablePath":"/usr/bin/google-chrome"}'` | 0 | valid SVG, 10803 bytes, **sandbox intact** |
+
+Why the system browser works where the bundled one does not: Google Chrome ships a setuid
+sandbox helper and an AppArmor profile; puppeteer's downloaded Chromium has neither, so it
+cannot construct a sandbox at all under the userns restriction. `google-chrome --headless`
+exits 0 on this machine, confirming it.
+
+**Chosen behaviour (amendment A7):** `render/mermaid.py` resolves a puppeteer config at render
+time — prefer `google-chrome`/`chromium`/`chromium-browser` via `executablePath` (sandbox
+stays on), and only fall back to `--no-sandbox` when no system browser exists. Written to a
+temporary JSON file, passed with `-p`, deleted afterwards.
+
+**This applies to Task 11 too.** R2's PNG rasterization plan calls for headless Chrome. It
+should use `/usr/bin/google-chrome` directly rather than a puppeteer-bundled Chromium, for the
+same reason.
+
+---
+
 ## 4. Summary of decisions handed to later tasks
 
 | Risk | Outcome | Downstream instruction |
 |---|---|---|
 | R1 | drawio CLI export **works** | `render/drawio.py` (Task 11): `xvfb-run -a drawio -x ...` (or plain when `DISPLAY` set); input path under `$HOME`, never `/tmp` (snap confinement) |
+| R6 (late) | mermaid render **works** via system Chrome | `render/mermaid.py` (Task 6, shipped): resolve a puppeteer config preferring a system browser's `executablePath`; `--no-sandbox` only as fallback. See §3b / amendment A7 |
 | R2 | excalidraw SVG render **works** via jsdom shim | Task 11: keep render+vision; ship the shim in `render/excalidraw.py`'s node helper; verify text elements separately. PNG rasterization is owned by Task 11 via headless Chrome (`/usr/bin/google-chrome` is installed on this machine) |
 | R3 | both tools now present | graphviz installed by local-extract (no sudo), not apt; doctor's apt-based hint is aspirational on this machine — installation is done and recorded here |
 | R4/R5 | `@drawio/mcp` is stdio-only and opens a browser editor; no XML returned | **RESOLVED:** conversion path retired; Task 10 builds `emit/drawio.py` as an owned Graphviz-driven mxGraph emitter (see the plan's "Execution amendments" section). `search_shapes` / multi-page tools remain usable |
