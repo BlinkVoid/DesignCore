@@ -83,7 +83,7 @@ def _rendered_svg(root: Path, spec_id: str, kind: str) -> Path | None:
         if entry is not None:
             candidates.append(entry.format)
     candidates.append(DEFAULT_FORMAT[kind])
-    candidates.extend(f for f in DEFAULT_FORMAT.values() if f not in candidates)
+    candidates = list(dict.fromkeys([*candidates, *DEFAULT_FORMAT.values()]))
 
     for fmt in candidates:
         svg = root / "out" / fmt / f"{spec_id}.svg"

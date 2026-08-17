@@ -7,6 +7,7 @@ from typing import Any
 from designcore.layout import Placement
 from designcore.spec import DiagramSpec
 
+EDGE_FONT_SIZE = 12
 STROKE_WIDTH = {"normal": 1, "primary": 3, "muted": 1}
 OPACITY = {"normal": 100, "primary": 100, "muted": 55}
 
@@ -99,11 +100,21 @@ def emit_excalidraw(spec: DiagramSpec, placements: dict[str, Placement]) -> dict
         elements.append(arrow)
 
         if edge.label:
-            label = _base(f"edge-{index}-label", (x1 + x2) / 2 - 30, (y1 + y2) / 2 - 20, 60, 20)
+            # Sized from the text: exportToSvg derives the scene bounding box
+            # from declared width/height, so a label that overflows its box
+            # gets cropped out of the SVG and PNG near the canvas edge.
+            width = max(len(edge.label) * EDGE_FONT_SIZE * 0.6, 24.0)
+            label = _base(
+                f"edge-{index}-label",
+                (x1 + x2) / 2 - width / 2,
+                (y1 + y2) / 2 - 20,
+                width,
+                20,
+            )
             label["type"] = "text"
             label["text"] = edge.label
             label["originalText"] = edge.label
-            label["fontSize"] = 12
+            label["fontSize"] = EDGE_FONT_SIZE
             label["fontFamily"] = 1
             label["textAlign"] = "center"
             label["verticalAlign"] = "middle"

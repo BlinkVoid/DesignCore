@@ -89,3 +89,19 @@ def test_upward_layout_arrow_runs_upward():
     arrow = _arrow("BT", {"a": Placement("a", 0, 72, 54, 36), "b": Placement("b", 0, 0, 54, 36)})
     assert arrow["y"] == 72             # leaves the top edge of a
     assert arrow["points"][-1] == [0, -36]
+
+
+def test_edge_label_box_grows_with_the_text():
+    """exportToSvg derives the scene bounding box from declared width/height,
+    so a label wider than its box overflows and can be cropped."""
+    def _label_width(text: str) -> float:
+        spec = DiagramSpec(
+            id="d", title="T", kind="concept", question="Q?", direction="LR",
+            nodes=(Node(id="a", label="A"), Node(id="b", label="B")),
+            edges=(Edge(source="a", target="b", label=text),),
+        )
+        elements = emit_excalidraw(spec, PLACEMENTS)["elements"]
+        return next(e for e in elements if e.get("id") == "edge-0-label")["width"]
+
+    assert _label_width("a much longer edge label") > _label_width("hi")
+    assert _label_width("a much longer edge label") >= 24 * 12 * 0.5

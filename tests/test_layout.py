@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-from designcore.layout import Placement, layout_groups, layout_spec, to_dot
+from designcore.layout import Placement, layout_all, layout_groups, layout_spec, to_dot
 from designcore.render import BackendMissing
 from designcore.spec import DiagramSpec, Edge, Group, Node
 
@@ -143,3 +143,19 @@ def test_all_four_directions_reach_rankdir_unfolded():
             nodes=(Node(id="a", label="A"),), edges=(),
         )
         assert f"rankdir={direction};" in to_dot(spec)
+
+
+def test_placements_and_group_boxes_come_from_one_dot_run():
+    """Two independent dot invocations double the layout cost of every drawio
+    render and would silently desynchronise if layout ever stopped being
+    deterministic."""
+    calls: list = []
+
+    def counting_run(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout=FAKE_JSON, stderr="")
+
+    nodes, groups = layout_all(SPEC, run=counting_run, which=lambda c: "/usr/bin/dot")
+    assert len(calls) == 1
+    assert set(nodes) == {"a", "b"}
+    assert set(groups) == {"g"}

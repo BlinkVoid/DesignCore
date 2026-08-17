@@ -19,6 +19,14 @@ SVG_NS = "{http://www.w3.org/2000/svg}"
 # exactly the truncated labels it exists to catch.
 BOXED_TAGS = (f"{SVG_NS}rect", f"{SVG_NS}foreignObject", f"{SVG_NS}image")
 
+# Content under these is never painted where it sits: a marker's box is in
+# marker units, a clipPath's rect is in its own coordinate space, and defs
+# are templates. Bounds-checking them reports clipping on a correct diagram.
+NON_RENDERING_TAGS = frozenset(
+    f"{SVG_NS}{tag}"
+    for tag in ("defs", "clipPath", "mask", "marker", "pattern", "symbol")
+)
+
 # Sub-pixel overhang is rounding, not visible clipping.
 EPSILON = 0.5
 
@@ -172,6 +180,8 @@ def check_svg_bounds(svg_path: Path) -> list[Finding]:
     stack = [(root, IDENTITY)]
     while stack:
         element, matrix = stack.pop()
+        if element.tag in NON_RENDERING_TAGS:
+            continue
         transform = element.get("transform")
         if transform:
             step = _parse_transform(transform)

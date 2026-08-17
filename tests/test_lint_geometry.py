@@ -135,3 +135,25 @@ def test_subpixel_canvas_overflow_is_tolerated():
 def test_subpixel_overlap_is_not_an_overlap():
     boxes = [Placement("a", 0, 0, 100.001, 50), Placement("b", 100, 0, 100, 50)]
     assert check_geometry(boxes) == []
+
+
+def test_definitions_are_not_bounds_checked(tmp_path):
+    """defs/marker/clipPath content lives in its own coordinate system and is
+    never painted where it sits, so bounds-checking it fails correct diagrams.
+    All three backends emit <defs>; mermaid emits <marker>."""
+    svg = _svg(tmp_path, '<defs><rect x="-9000" y="-9000" width="10" height="10"/></defs>')
+    assert check_svg_bounds(svg) == []
+
+
+def test_marker_content_is_not_bounds_checked(tmp_path):
+    svg = _svg(tmp_path, '<marker><rect x="0" y="0" width="9000" height="10"/></marker>')
+    assert check_svg_bounds(svg) == []
+
+
+def test_painted_content_is_still_checked_alongside_definitions(tmp_path):
+    svg = _svg(
+        tmp_path,
+        '<defs><rect x="-9000" y="-9000" width="10" height="10"/></defs>'
+        '<rect x="10" y="10" width="9000" height="10"/>',
+    )
+    assert [f.code for f in check_svg_bounds(svg)] == ["CLIPPED_CONTENT"]

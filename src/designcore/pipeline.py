@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
 from designcore.emit.drawio import emit_drawio
 from designcore.emit.excalidraw import emit_excalidraw
 from designcore.emit.mermaid import emit_mermaid
-from designcore.layout import Placement, layout_groups, layout_spec
+from designcore.layout import Placement, layout_all
 from designcore.lint import Finding
 from designcore.lint.density import check_density
 from designcore.lint.geometry import check_geometry, check_svg_bounds
@@ -38,14 +39,22 @@ class Deps:
 
     @classmethod
     def default(cls) -> "Deps":
+        # Both callables read from one memoized layout_all, so the drawio path
+        # -- which needs nodes and groups -- runs dot once instead of twice,
+        # and the two results provably describe the same layout. DiagramSpec
+        # is a frozen dataclass of tuples, so it is hashable as a cache key.
+        @lru_cache(maxsize=1)
+        def _layout_both(spec: DiagramSpec) -> tuple[dict, dict]:
+            return layout_all(spec)
+
         return cls(
             render_map={
                 "mermaid": render_mermaid,
                 "drawio": render_drawio,
                 "excalidraw": render_excalidraw,
             },
-            layout=layout_spec,
-            layout_groups=layout_groups,
+            layout=lambda spec: _layout_both(spec)[0],
+            layout_groups=lambda spec: _layout_both(spec)[1],
         )
 
 

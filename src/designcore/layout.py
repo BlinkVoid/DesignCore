@@ -87,13 +87,31 @@ def _canvas_height(data: dict) -> float:
     return float(data["bb"].split(",")[3])
 
 
+def layout_all(
+    spec: DiagramSpec,
+    run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+    which: Callable[[str], str | None] = shutil.which,
+) -> tuple[dict[str, Placement], dict[str, Placement]]:
+    """Return (node placements, group boxes) from a single Graphviz run.
+
+    Callers needing both -- the drawio emitter does -- should use this rather
+    than calling layout_spec and layout_groups separately: one dot invocation
+    instead of two, and the two results provably describe the same layout.
+    """
+    data = _run_dot(spec, run, which)
+    return _placements(spec, data), _group_boxes(spec, data)
+
+
 def layout_spec(
     spec: DiagramSpec,
     run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
     which: Callable[[str], str | None] = shutil.which,
 ) -> dict[str, Placement]:
     """Return top-left-origin pixel placements keyed by node id."""
-    data = _run_dot(spec, run, which)
+    return _placements(spec, _run_dot(spec, run, which))
+
+
+def _placements(spec: DiagramSpec, data: dict) -> dict[str, Placement]:
     canvas_height = _canvas_height(data)
     node_ids = {n.id for n in spec.nodes}
 
@@ -126,7 +144,10 @@ def layout_groups(
     bottom-left origin; converted here to the same top-left pixel convention
     as layout_spec so emitters need no coordinate maths.
     """
-    data = _run_dot(spec, run, which)
+    return _group_boxes(spec, _run_dot(spec, run, which))
+
+
+def _group_boxes(spec: DiagramSpec, data: dict) -> dict[str, Placement]:
     canvas_height = _canvas_height(data)
     by_cluster_name = {f"cluster_{group.id}": group.id for group in spec.groups}
 
