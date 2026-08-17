@@ -1,0 +1,10 @@
+{
+  "name": "concept-sketch",
+  "version": "1.0.0",
+  "description": "Verified whiteboard-style concept sketches for explaining mental models.",
+  "category": "design",
+  "activation": {
+    "strategy": "manual",
+    "triggers": ["sketch", "concept", "whiteboard", "explain", "diagram", "excalidraw"]
+  }
+}

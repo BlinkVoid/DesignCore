@@ -1,0 +1,10 @@
+{
+  "name": "architecture-diagram",
+  "version": "1.0.0",
+  "description": "Verified system-structure diagrams: context, container, deployment, network.",
+  "category": "design",
+  "activation": {
+    "strategy": "manual",
+    "triggers": ["architecture", "diagram", "c4", "topology", "deployment", "system design"]
+  }
+}

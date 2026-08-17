@@ -1,0 +1,10 @@
+{
+  "name": "flow-diagram",
+  "version": "1.0.0",
+  "description": "Verified process diagrams: sequence, state, and flow.",
+  "category": "design",
+  "activation": {
+    "strategy": "manual",
+    "triggers": ["flow", "sequence", "state machine", "process", "diagram", "swimlane"]
+  }
+}
