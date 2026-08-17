@@ -108,6 +108,23 @@ following amendments are **binding** and supersede the named task steps below.
   This also corrects a Task 2 gap: `doctor` proves a backend is **on PATH**, never that it can
   render. Task 14's end-to-end verification is the first place that distinction is enforced.
 
+## Execution amendments (2026-08-17, during Task 7)
+
+- **A8 (fixes Task 7):** Task 7 Step 3's `to_dot` interpolates labels and ids into DOT
+  double-quoted strings without escaping. `spec.py` places no charset restriction on a label,
+  and `emit/mermaid.py` escapes quotes, so a spec that renders correctly as Mermaid killed
+  every layout-dependent format with `syntax error in line 4 near '"'`. Since Tasks 9, 10 and
+  11 all take their geometry from `layout_spec`, the blast radius was drawio *and* Excalidraw.
+
+  `layout.py` gains `_quote()` — backslash first, then double quote — applied to node ids,
+  node labels, group labels, and edge endpoints. Verified against real Graphviz: a spec with
+  labels `the "Store"` and `C:\path` previously raised `RenderError` and now lays out.
+
+  Reviewer's note: this is the same class of defect as an unescaped label in any other
+  emitter. Task 9's Excalidraw emitter and Task 10's mxGraph emitter write labels into JSON
+  and XML respectively; both need their own escaping check, and XML needs `&`, `<`, `>` as
+  well. Do not assume `_quote` covers them — it is DOT-specific.
+
 ---
 
 ### Task 1: Repository scaffold and `designcore doctor`
