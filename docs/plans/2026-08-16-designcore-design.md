@@ -1,7 +1,7 @@
 # DesignCore — Design Spec
 
 - **Date:** 2026-08-16
-- **Status:** Approved design, not yet implemented
+- **Status:** Implemented in v1 — see README.md
 - **Scope:** DesignCore v1 — the diagramming subsystem (first skill family)
 - **Next artifact:** implementation plan (`docs/plans/2026-08-16-designcore-implementation-plan.md`)
 
@@ -97,7 +97,7 @@ Sources:
 skills/architecture-diagram    flow-diagram    concept-sketch      ← judgment
 skills/_shared/references/     format-selection · legibility · mermaid · drawio · excalidraw
 src/designcore/                spec · layout · emit · render · lint · manifest · cli
-external                       @drawio/mcp · mermaid-cli · graphviz · drawio CLI
+external                       mermaid-cli · graphviz · drawio CLI · node (+jsdom) · chrome
 ```
 
 ### Repository layout
@@ -127,7 +127,8 @@ DesignCore/
 │   └── render/
 │       ├── mermaid.py        # mmdc
 │       ├── drawio.py         # drawio CLI export (xvfb if needed)
-│       └── excalidraw.py     # see risk R2
+│       ├── excalidraw.py     # jsdom helper (js/) + chrome rasterization
+│       └── js/                # shipped Node export helper, pinned deps
 ├── skills/
 │   ├── _shared/references/
 │   ├── architecture-diagram/  { SKILL.md, manifest.json }
@@ -246,9 +247,13 @@ docs/
     │   ├── request-flow.spec.yaml
     │   └── request-flow.mmd
     └── out/
-        ├── system-context.svg / .png
-        └── request-flow.svg / .png
+        ├── drawio/system-context.svg / .png
+        └── mermaid/request-flow.svg / .png
 ```
+
+Renders are namespaced by format (`out/<format>/`). Every renderer names its output from the
+source stem, which is the diagram id in all three formats, so a shared `out/` made a second
+format silently overwrite the first (plan amendment A13).
 
 `diagrams.yaml`:
 
@@ -262,7 +267,7 @@ diagrams:
     question: "Which external actors and systems does the platform talk to?"
     spec: src/system-context.spec.yaml
     source: src/system-context.drawio
-    rendered: [out/system-context.svg, out/system-context.png]
+    rendered: [out/drawio/system-context.svg, out/drawio/system-context.png]
     embedded_in: [../architecture.md]
     generated_by: designcore
     generated_at: 2026-08-16
@@ -343,7 +348,7 @@ Deferred deliberately; none of these require rework to add later.
 | # | Risk | Impact | Mitigation |
 |---|---|---|---|
 | R1 | ~~`drawio` snap CLI headless export may require `xvfb`~~ **Retired 2026-08-16** (probe: `docs/plans/2026-08-16-render-backend-findings.md` §1) | — | Export works: `xvfb-run -a drawio -x -f png -o out.png in.drawio` (plain works when `DISPLAY` is set; `--no-sandbox` not needed — the snap injects it). Hard constraint discovered: the strictly-confined snap cannot read `/tmp`; input/output paths must live under `$HOME`. `render/drawio.py` must honor this. |
-| R2 | ~~No proven `.excalidraw` → SVG/PNG renderer~~ **Retired 2026-08-16** (probe: findings §3) | — | `@excalidraw/utils` `exportToSvg` works in Node **with a jsdom DOM shim** (window/document/navigator/devicePixelRatio/location/rAF/FontFace installed before a dynamic import). Plain Node fails at import time (`window is not defined`). Task 12 keeps render+vision via this shim; text-element rendering through stubbed fonts remains to be verified there. |
+| R2 | ~~No proven `.excalidraw` → SVG/PNG renderer~~ **Retired 2026-08-16** (probe: findings §3) | — | `@excalidraw/utils` `exportToSvg` works in Node **with a jsdom DOM shim** (window/document/navigator/devicePixelRatio/location/rAF/FontFace installed before a dynamic import). Plain Node fails at import time (`window is not defined`). Task 11 keeps render+vision via this shim. **Text-element rendering verified 2026-08-17 (Task 9):** all labels render as real `<text>`; the stubbed fonts only drop the embedded font-face CSS, with a non-fatal warning. The dependency must be pinned to the exact prerelease `0.1.3-test32` (plan amendment A11). |
 | R3 | `mmdc` and Graphviz `dot` not installed on this machine | Nothing renders | **Resolved 2026-08-16 without sudo:** `mmdc` via `npm install -g` (nvm user prefix); graphviz via local-extract (`apt-get download` + `dpkg -x` into `~/.local/share/designcore/graphviz/rootfs`, wrapper at `~/.local/bin/dot` setting `LD_LIBRARY_PATH`/`GVBINDIR`, `dot -c` once) — **not** via `sudo apt install` as doctor's hint implies. All four backends report `ok`. Method recorded in findings §0. |
 | R4 | `@drawio/mcp` desktop-Electron path upstream-broken (CSP) — **amended 2026-08-16:** probing (findings §2) shows the stdio server is the *only* invocation surface, and `open_drawio_mermaid` opens a browser editor URL rather than returning mxGraph XML | The mermaid→mxGraph conversion path assumed in §6 (drawio row) does not exist headlessly | **Resolved 2026-08-16:** the conversion path is retired; `emit/drawio.py` is an owned emitter driven by Graphviz placements (§6 drawio row; plan "Execution amendments", A1). `search_shapes` / multi-page tools remain usable as documented. |
 | R5 | Dependency on upstream `@drawio/mcp` tool names/shapes — **amended 2026-08-16:** confirmed parameter shape differs from expectation (`content`, not `mermaid`) | Breakage on upstream change; conversion itself unproven (see R4) | **Resolved 2026-08-16 with R4:** no conversion dependency remains — the owned emitter calls no `@drawio/mcp` conversion tool. Any future optional use (`search_shapes`, multi-page tools) stays isolated in `emit/drawio.py`; golden tests pin the expected contract. |
