@@ -1,0 +1,106 @@
+"""diagrams.yaml: what each diagram is for, and where its files live."""
+
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field, replace
+from datetime import date
+from pathlib import Path
+
+import yaml
+
+from designcore.lint import Finding
+
+
+@dataclass(frozen=True)
+class DiagramEntry:
+    id: str
+    title: str
+    kind: str
+    format: str
+    question: str
+    spec: str
+    source: str
+    rendered: list[str] = field(default_factory=list)
+    embedded_in: list[str] = field(default_factory=list)
+    hand_owned: bool = False
+    generated_by: str = "designcore"
+    generated_at: str = field(default_factory=lambda: date.today().isoformat())
+
+    def __post_init__(self) -> None:
+        if not self.question.strip():
+            raise ValueError(
+                f"diagram {self.id!r} has no question; a diagram that cannot state "
+                "the one question it answers should be split or deleted"
+            )
+
+
+@dataclass(frozen=True)
+class Manifest:
+    version: int
+    diagrams: list[DiagramEntry]
+
+
+def load_manifest(path: Path) -> Manifest:
+    with Path(path).open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle) or {}
+    return Manifest(
+        version=int(data.get("version", 1)),
+        diagrams=[DiagramEntry(**d) for d in data.get("diagrams", [])],
+    )
+
+
+def save_manifest(manifest: Manifest, path: Path) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"version": manifest.version, "diagrams": [asdict(d) for d in manifest.diagrams]}
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(payload, handle, sort_keys=False, allow_unicode=True)
+
+
+def upsert(manifest: Manifest, entry: DiagramEntry) -> Manifest:
+    diagrams = list(manifest.diagrams)
+    for index, existing in enumerate(diagrams):
+        if existing.id == entry.id:
+            diagrams[index] = entry
+            return replace(manifest, diagrams=diagrams)
+    diagrams.append(entry)
+    return replace(manifest, diagrams=diagrams)
+
+
+def check_manifest(root: Path) -> list[Finding]:
+    """Validate that every manifest entry matches what is on disk."""
+    root = Path(root)
+    manifest = load_manifest(root / "diagrams.yaml")
+    findings: list[Finding] = []
+
+    for entry in manifest.diagrams:
+        source = root / entry.source
+        if not source.exists():
+            findings.append(
+                Finding("MISSING_SOURCE", "error", f"source {entry.source} is missing", entry.id)
+            )
+            continue
+
+        for rendered in entry.rendered:
+            target = root / rendered
+            if not target.exists():
+                findings.append(
+                    Finding("MISSING_RENDER", "error", f"render {rendered} is missing", entry.id)
+                )
+            elif target.stat().st_mtime < source.stat().st_mtime:
+                findings.append(
+                    Finding(
+                        "STALE_RENDER",
+                        "warning",
+                        f"{rendered} is older than its source; re-run designcore render",
+                        entry.id,
+                    )
+                )
+
+        for embed in entry.embedded_in:
+            if not (root / embed).exists():
+                findings.append(
+                    Finding("BROKEN_EMBED", "warning", f"embed target {embed} is missing", entry.id)
+                )
+
+    return findings
