@@ -130,20 +130,32 @@ def test_check_ignores_the_manifest_and_referenced_files(tmp_path):
     assert check_manifest(_tree(tmp_path, _entry())) == []
 
 
-def test_upsert_keys_on_id_and_format():
-    """Amendment A13 gave each format its own out/ directory so renders coexist;
-    the manifest has to describe that, or rendering a second format silently
-    drops the first entry and orphans its files."""
+def test_upsert_keys_on_id_alone_so_a_new_format_replaces_the_old():
+    """Amendment A23: a diagram has exactly one format at a time. Re-rendering
+    as another format replaces the entry rather than accumulating a second one;
+    the abandoned files are then unreferenced and _orphaned_artifacts reports
+    them."""
     manifest = Manifest(version=1, diagrams=[_entry(format="drawio")])
     updated = upsert(manifest, _entry(format="mermaid", source="src/system-context.mmd"))
-    assert [(d.id, d.format) for d in updated.diagrams] == [
-        ("system-context", "drawio"),
-        ("system-context", "mermaid"),
-    ]
+    assert [(d.id, d.format) for d in updated.diagrams] == [("system-context", "mermaid")]
 
 
-def test_upsert_still_replaces_the_same_id_and_format():
-    manifest = Manifest(version=1, diagrams=[_entry(format="drawio")])
-    updated = upsert(manifest, _entry(format="drawio", title="Renamed"))
-    assert len(updated.diagrams) == 1
-    assert updated.diagrams[0].title == "Renamed"
+def test_upsert_collapses_a_manifest_left_multi_format_by_a18():
+    """Manifests written before A23 hold one entry per (id, format). Replacing
+    only the first match leaves the rest behind, and `render` then reads its
+    sticky format off whichever entry happens to sit first — the example
+    manifest re-rendered as mermaid when excalidraw was recorded further down."""
+    manifest = Manifest(version=1, diagrams=[
+        _entry(format="mermaid"), _entry(format="drawio"), _entry(format="excalidraw"),
+    ])
+    updated = upsert(manifest, _entry(format="excalidraw"))
+    assert [(d.id, d.format) for d in updated.diagrams] == [("system-context", "excalidraw")]
+
+
+def test_upsert_replaces_in_place_rather_than_reordering():
+    """A format switch must not move the diagram to the end of the manifest —
+    entry order is the file's reading order and belongs to the author."""
+    manifest = Manifest(version=1, diagrams=[_entry(id="first"), _entry(id="second")])
+    updated = upsert(manifest, _entry(id="first", format="mermaid"))
+    assert [d.id for d in updated.diagrams] == ["first", "second"]
+    assert updated.diagrams[0].format == "mermaid"

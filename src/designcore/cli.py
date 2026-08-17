@@ -13,12 +13,17 @@ from designcore.lint import has_errors
 from designcore.manifest import Manifest, check_manifest, load_manifest, save_manifest, upsert
 from designcore.pipeline import GEOMETRY_FORMATS, Deps, compile_diagram, lint_diagram
 from designcore.render import BackendMissing, RenderError
-from designcore.spec import SpecError, load_spec
+from designcore.spec import KINDS, SpecError, load_spec
 
-DEFAULT_FORMAT = {
-    "context": "drawio", "container": "drawio", "deployment": "drawio", "network": "drawio",
-    "sequence": "mermaid", "state": "mermaid", "flow": "mermaid", "concept": "excalidraw",
-}
+FORMATS = ("mermaid", "drawio", "excalidraw")
+
+# Amendment A23. There used to be a per-kind table here, but no emitter reads
+# `spec.kind` -- a `sequence` spec compiles to the same box-and-arrow graph in
+# all three formats, not to mermaid's native sequenceDiagram syntax -- so the
+# table only ever encoded taste, and it spread one diagram across several
+# formats by accident. One diagram has one format: excalidraw unless asked
+# otherwise, and mermaid is asked for when the diagram is going into markdown.
+DEFAULT_FORMAT = "excalidraw"
 
 
 def _print_findings(findings) -> None:
@@ -46,21 +51,26 @@ def _cmd_new(args: argparse.Namespace) -> int:
         "groups": [],
     }
     target.write_text(yaml.safe_dump(scaffold, sort_keys=False), encoding="utf-8")
-    # The kind's default is the only honest answer here: a spec is
-    # format-agnostic by design, and no manifest entry exists yet, so there is
-    # nowhere to record a different choice. Pass --format to `render` instead.
-    fmt = DEFAULT_FORMAT[args.kind]
-    print(f"created {target} (renders as {fmt}; override with: designcore render {args.id} --format ...)")
+    # The default is the only honest answer here: a spec is format-agnostic by
+    # design, and no manifest entry exists yet, so there is nowhere to record a
+    # different choice. Pass --format to `render` instead; it sticks from then on.
+    print(
+        f"created {target} (renders as {DEFAULT_FORMAT}; "
+        f"override with: designcore render {args.id} --format ...)"
+    )
     return 0
 
 
 def _cmd_render(args: argparse.Namespace) -> int:
     root = Path(args.root)
     spec = load_spec(root / "src" / f"{args.id}.spec.yaml")
-    fmt = args.format or DEFAULT_FORMAT[spec.kind]
     manifest_path = root / "diagrams.yaml"
     manifest = load_manifest(manifest_path) if manifest_path.exists() else Manifest(1, [])
     existing = next((d for d in manifest.diagrams if d.id == spec.id), None)
+    # The choice is sticky: an explicit --format wins, otherwise the format this
+    # diagram was last rendered as. Without that, a bare re-render would quietly
+    # move a diagram back to the default and orphan the render it already had.
+    fmt = args.format or (existing.format if existing else DEFAULT_FORMAT)
 
     entry = compile_diagram(
         spec, fmt, root, Deps.default(), hand_owned=bool(existing and existing.hand_owned)
@@ -70,26 +80,25 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
-def _recorded_formats(root: Path, spec_id: str) -> list[str]:
-    """Formats this diagram has been rendered as, per the manifest."""
+def _recorded_format(root: Path, spec_id: str) -> str | None:
+    """The format this diagram was last rendered as, per the manifest."""
     manifest_path = root / "diagrams.yaml"
     if not manifest_path.exists():
-        return []
-    return [d.format for d in load_manifest(manifest_path).diagrams if d.id == spec_id]
+        return None
+    return next((d.format for d in load_manifest(manifest_path).diagrams if d.id == spec_id), None)
 
 
-def _rendered_svg(root: Path, spec_id: str, kind: str) -> Path | None:
+def _rendered_svg(root: Path, spec_id: str) -> Path | None:
     """Locate a diagram's rendered SVG, which lives under out/<format>/.
 
-    Prefers the format the manifest records; falls back to the kind's default
-    and then to any format present, so lint still inspects the render after a
-    format change.
+    The manifest decides: since A23 a diagram holds one format, so the recorded
+    entry names the render lint should be checking. The remaining fallbacks
+    cover a diagram rendered before any entry was written -- previously this
+    guessed among every format present, which meant lint could bounds-check one
+    render and report the diagram clean while another sat clipped.
     """
-    candidates = list(
-        dict.fromkeys(
-            [*_recorded_formats(root, spec_id), DEFAULT_FORMAT[kind], *DEFAULT_FORMAT.values()]
-        )
-    )
+    recorded = _recorded_format(root, spec_id)
+    candidates = list(dict.fromkeys([*([recorded] if recorded else []), DEFAULT_FORMAT, *FORMATS]))
 
     for fmt in candidates:
         svg = root / "out" / fmt / f"{spec_id}.svg"
@@ -101,10 +110,10 @@ def _rendered_svg(root: Path, spec_id: str, kind: str) -> Path | None:
 def _cmd_lint(args: argparse.Namespace) -> int:
     root = Path(args.root)
     spec = load_spec(root / "src" / f"{args.id}.spec.yaml")
-    svg = _rendered_svg(root, args.id, spec.kind)
+    svg = _rendered_svg(root, args.id)
     # The render's own directory names its format (out/<format>/), which beats
-    # guessing when a diagram exists in several formats at once.
-    fmt = svg.parent.name if svg is not None else DEFAULT_FORMAT[spec.kind]
+    # inferring it from anywhere else.
+    fmt = svg.parent.name if svg is not None else DEFAULT_FORMAT
 
     # Only lint placement geometry for formats that actually emit it; for
     # mermaid the layout is recomputed by the renderer, so check_svg_bounds
@@ -156,13 +165,13 @@ def main(argv: list[str] | None = None) -> int:
 
     new = subparsers.add_parser("new", help="Scaffold a diagram spec")
     new.add_argument("id")
-    new.add_argument("--kind", required=True, choices=sorted(DEFAULT_FORMAT))
+    new.add_argument("--kind", required=True, choices=sorted(KINDS))
     add_root(new)
     new.set_defaults(func=_cmd_new)
 
     render = subparsers.add_parser("render", help="Compile and render a diagram")
     render.add_argument("id")
-    render.add_argument("--format", choices=["mermaid", "drawio", "excalidraw"])
+    render.add_argument("--format", choices=list(FORMATS))
     add_root(render)
     render.set_defaults(func=_cmd_render)
 

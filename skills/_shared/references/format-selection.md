@@ -1,53 +1,55 @@
 # Choosing a diagram format
 
-A decision rubric, not a preference. Pick by what the diagram is *for*.
+A decision rubric, not a preference. One diagram has **one** format.
 
-## Mermaid — the default
+## Excalidraw — the default
 
-Choose it for anything embedded in repo docs, reviewed in PRs, or under ~15 nodes.
+Unless the diagram is going into a markdown file, this is the answer.
 
-- Renders natively on GitHub, Obsidian, and Claude artifacts.
-- Diffs cleanly: the source is text, so a reviewer sees what changed.
-- Costs least to produce and to regenerate.
+- The richest shape and boundary vocabulary of the three: rounded containers,
+  dashed group enclosures, hachure fills, and arrows that follow the Graphviz
+  splines around whatever sits between their endpoints.
+- Reads as a designed diagram rather than an auto-generated one, without the
+  model placing a single coordinate.
 
 If you cannot articulate why another format is better, this is the answer.
 
-## draw.io — detailed architecture a human will edit
+## Mermaid — diagrams that live inside markdown
 
-Choose it for detailed system architecture, branded cloud/network icons,
-multi-page drill-down, or anything someone will later open and hand-edit.
+Choose it when the diagram is embedded in a `.md` file — a README, a design doc,
+a PR description.
 
-## Excalidraw — deliberately informal
+- Renders natively on GitHub, Obsidian, and Claude artifacts, so the diagram
+  travels with the document instead of as a linked image.
+- The source is text, so a reviewer sees what changed in the diff.
 
-Choose it for concept sketches and teaching diagrams, where the hand-drawn look
-signals "this is a mental model, not a spec". The informality is the message; do
-not use it for anything a reader might mistake for authoritative.
+That is the whole of its case. "It's a flow chart" or "it's a sequence" is not a
+reason — no emitter reads the spec's `kind`, and all three formats compile the
+same graph.
 
-## Default by kind
+## draw.io — a human will open and edit it
 
-`designcore` picks a format from the spec's `kind` (this table is
-`cli.DEFAULT_FORMAT` verbatim):
+Choose it when someone will later hand-edit the diagram, or when it needs
+branded cloud/network icons or multi-page drill-down. Mark it `hand_owned: true`
+in the manifest once they have, or the next `render` overwrites their work.
 
-| kind | format |
-|---|---|
-| `context` | drawio |
-| `container` | drawio |
-| `deployment` | drawio |
-| `network` | drawio |
-| `sequence` | mermaid |
-| `state` | mermaid |
-| `flow` | mermaid |
-| `concept` | excalidraw |
+## How the choice is recorded
 
-`--format` overrides it: `designcore render <id> --format mermaid`.
+`designcore render <id>` uses, in order:
 
-Renders are written to `out/<format>/`, so the same diagram can exist in more
-than one format without one overwriting another. The manifest records one
-entry per `(id, format)` pair, so every format a diagram has been rendered as
-stays tracked.
+1. `--format` if you pass it,
+2. otherwise the format the manifest already records for that diagram,
+3. otherwise `excalidraw`.
+
+The choice is **sticky**: pass `--format mermaid` once and every later bare
+`render` of that diagram stays mermaid. A diagram has exactly one manifest entry
+and one format at a time, so switching format replaces the entry rather than
+adding a second one.
 
 `designcore new` takes only `--kind`; the format belongs to the render, not to
-the spec, so pass `--format` to `designcore render`. If you re-render in a new
-format and no longer want the old one, delete its files — `designcore check`
-reports anything under `src/` or `out/` that no entry references as
-`ORPHANED_ARTIFACT`, but never deletes it for you.
+the spec.
+
+**Switching format leaves the old files behind.** They are no longer referenced
+by any entry, so `designcore check` reports them as `ORPHANED_ARTIFACT` — delete
+them yourself. It reports and never deletes: removing a file a document may
+still link to is your decision, not the tool's.

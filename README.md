@@ -43,17 +43,22 @@ npm install --prefix src/designcore/render/js
 | `designcore doctor` | report backend availability |
 
 `--root` points at the diagram directory (default `docs/diagrams`). `render`
-also takes `--format`, which overrides the default chosen from the spec's
-`kind`; renders land in `out/<format>/` and each format gets its own manifest
-entry, so one diagram can exist in several formats at once.
+also takes `--format`, and the choice is sticky: it wins over the format the
+manifest already records, which in turn wins over the `excalidraw` default. A
+diagram has one format and one manifest entry at a time, so switching format
+replaces the entry and leaves the old files for `check` to report as orphans.
+
+Mermaid is the one to ask for when the diagram is going into a markdown file,
+where it renders natively and diffs as text. See
+[skills/_shared/references/format-selection.md](skills/_shared/references/format-selection.md).
 
 ## Example
 
 A worked example lives in [`examples/docs/diagrams/`](examples/docs/diagrams/):
-one spec compiled to all three formats, with renders and a populated manifest.
+one spec, its excalidraw render, and a populated manifest.
 
 ```bash
-uv run designcore render designcore-pipeline --root examples/docs/diagrams --format mermaid
+uv run designcore render designcore-pipeline --root examples/docs/diagrams
 ```
 
 ## The two rules

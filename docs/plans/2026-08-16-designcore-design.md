@@ -288,7 +288,7 @@ they are why the manifest exists at all.
 
 | Command | Behavior |
 |---|---|
-| `designcore new <id> --kind <k> [--format <f>]` | Scaffold a spec file and manifest entry; format defaults to the rubric's choice for `--kind`. |
+| `designcore new <id> --kind <k>` | Scaffold a spec file. No `--format`: a spec is format-agnostic and no entry exists yet (A17). Format is chosen at render time, defaults to `excalidraw`, and sticks (A23). |
 | `designcore render <id\|--all>` | Compile spec → source → svg + png; update manifest. |
 | `designcore lint <id\|--all>` | Structural + geometry + density checks; non-zero exit on failure. |
 | `designcore check` | Manifest integrity: referenced files exist, embeds resolve, rendered outputs are newer than sources. |

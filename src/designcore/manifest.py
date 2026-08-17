@@ -58,19 +58,33 @@ def save_manifest(manifest: Manifest, path: Path) -> None:
 
 
 def upsert(manifest: Manifest, entry: DiagramEntry) -> Manifest:
-    """Insert or replace an entry, keyed by (id, format).
+    """Insert or replace an entry, keyed by id.
 
-    Not by id alone: amendment A13 gave each format its own `out/` directory
-    so a diagram can exist in several formats at once, and a manifest keyed
-    only by id would drop the previous entry and orphan its files on the
-    second render.
+    Amendment A23: a diagram has exactly one format at a time, so re-rendering
+    as another format replaces the entry rather than accumulating a second one.
+    The previous format's files are then referenced by nothing, which is
+    precisely what `_orphaned_artifacts` reports — the switch is visible, and
+    deleting the leftovers stays the author's decision.
+
+    Replacement is in place: entry order is the manifest's reading order and
+    belongs to whoever wrote it, so a format switch must not shuffle a diagram
+    to the bottom of the file.
+
+    Every entry for the id collapses into that one, not just the first match.
+    Manifests written under A18 hold one entry per (id, format), and leaving the
+    extras behind means `cli._cmd_render` reads its sticky format off whichever
+    of them sits first — the shipped example re-rendered as mermaid when the
+    excalidraw entry was further down the file.
     """
     diagrams = list(manifest.diagrams)
-    for index, existing in enumerate(diagrams):
-        if (existing.id, existing.format) == (entry.id, entry.format):
-            diagrams[index] = entry
-            return replace(manifest, diagrams=diagrams)
-    diagrams.append(entry)
+    matches = [index for index, existing in enumerate(diagrams) if existing.id == entry.id]
+    if not matches:
+        diagrams.append(entry)
+        return replace(manifest, diagrams=diagrams)
+
+    diagrams[matches[0]] = entry
+    for index in reversed(matches[1:]):
+        del diagrams[index]
     return replace(manifest, diagrams=diagrams)
 
 

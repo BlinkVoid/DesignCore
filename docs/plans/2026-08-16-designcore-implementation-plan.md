@@ -273,9 +273,44 @@ look at — the same lesson A15 recorded.
   labelled dashed enclosures, written *ahead of* their members so Excalidraw's paint order puts
   them behind, and styled as boundaries rather than as shapes competing with the nodes inside.
 
-**Known gap (not yet fixed):** since A18 a diagram can exist in several formats at once, but
-`designcore lint` has no `--format`; `cli._rendered_svg` returns the first render it finds, so
-lint bounds-checks exactly one of the three and reports `clean` for the diagram as a whole.
+## Execution amendments (2026-08-17, one diagram one format)
+
+- **A23 (reverses A18, supersedes the `kind → format` table in Tasks 13 and 15):** a diagram
+  has **one** format at a time, chosen by the author. `manifest.upsert` is keyed by `id` alone
+  again and replaces in place, so re-rendering as another format swaps the entry instead of
+  accumulating a second one.
+
+  A18 was solving the wrong problem. It let one diagram exist as three renders at once, which
+  nothing wanted: the shipped example carried three copies of the same picture, and it opened
+  the gap recorded above — `lint` has no `--format`, so `_rendered_svg` picked whichever render
+  it found first, bounds-checked that one, and reported the diagram clean while another sat
+  clipped. With one format per diagram the manifest entry names the render unambiguously and
+  the gap closes without a flag.
+
+  The per-kind default table is gone with it. No emitter reads `spec.kind` — a `sequence` spec
+  compiles to the same box-and-arrow graph in all three formats, not to mermaid's native
+  `sequenceDiagram` syntax — so the table encoded taste while looking like semantics, and it
+  spread diagrams across formats by accident. `render` now resolves: `--format`, else the
+  format the manifest records (the choice is sticky), else `excalidraw`.
+
+  **Excalidraw is the default** on the strength of its output: rounded containers, dashed group
+  enclosures, hachure fills, and spline-following arrows (A20–A22) make it the format with the
+  richest vocabulary. Mermaid is requested when the diagram is going into a markdown file,
+  where native rendering and a text diff are worth more than the shapes. The old rubric had
+  this backwards, framing excalidraw as *deliberately informal* and "not for anything a reader
+  might mistake for authoritative" — that framing is dropped, not softened.
+
+  `out/<format>/` stays. A sticky format means A13's silent-overwrite cannot recur, but the
+  per-format directories keep an abandoned render visible for `check` to flag as
+  `ORPHANED_ARTIFACT` rather than letting a switch overwrite same-named files.
+
+  **Migration:** `upsert` collapses *every* entry for an id, not just the first match. A18-era
+  manifests hold one entry per (id, format), and replacing only the first left the rest in the
+  file — from which `_cmd_render` then read its sticky format. Caught on the example itself: a
+  bare re-render came back mermaid because the mermaid entry sat above the excalidraw one. The
+  first render after this change heals the manifest. Which entry a legacy manifest yields
+  before that heal is arbitrary, and unavoidably so — a multi-format manifest has no fact about
+  which format was meant. Pass `--format` once on such a diagram.
 
 ---
 
@@ -3095,6 +3130,10 @@ git commit -m "test: verify the full pipeline end to end on a real diagram"
 - [ ] **Step 1: Write `format-selection.md`**
 
 Content, stated as a decision rubric, not prose:
+
+> **Superseded by A23.** The rubric below was written when mermaid was the default and
+> excalidraw meant "deliberately informal". Both are reversed; the file as shipped is the
+> current one.
 
 - **Mermaid** — default. Choose it for anything embedded in repo docs, reviewed in PRs, or under ~15 nodes. Renders natively on GitHub, Obsidian, and Claude artifacts; diffs cleanly; costs least.
 - **draw.io** — detailed system architecture, branded cloud/network icons, multi-page drill-down, or anything a human will later open and hand-edit.
