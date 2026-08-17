@@ -11,7 +11,7 @@ import yaml
 from designcore.doctor import check_backends
 from designcore.lint import has_errors
 from designcore.manifest import Manifest, check_manifest, load_manifest, save_manifest, upsert
-from designcore.pipeline import Deps, compile_diagram, lint_diagram
+from designcore.pipeline import GEOMETRY_FORMATS, Deps, compile_diagram, lint_diagram
 from designcore.render import BackendMissing, RenderError
 from designcore.spec import SpecError, load_spec
 
@@ -46,8 +46,11 @@ def _cmd_new(args: argparse.Namespace) -> int:
         "groups": [],
     }
     target.write_text(yaml.safe_dump(scaffold, sort_keys=False), encoding="utf-8")
-    fmt = args.format or DEFAULT_FORMAT[args.kind]
-    print(f"created {target} (format: {fmt})")
+    # The kind's default is the only honest answer here: a spec is
+    # format-agnostic by design, and no manifest entry exists yet, so there is
+    # nowhere to record a different choice. Pass --format to `render` instead.
+    fmt = DEFAULT_FORMAT[args.kind]
+    print(f"created {target} (renders as {fmt}; override with: designcore render {args.id} --format ...)")
     return 0
 
 
@@ -67,6 +70,14 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _recorded_formats(root: Path, spec_id: str) -> list[str]:
+    """Formats this diagram has been rendered as, per the manifest."""
+    manifest_path = root / "diagrams.yaml"
+    if not manifest_path.exists():
+        return []
+    return [d.format for d in load_manifest(manifest_path).diagrams if d.id == spec_id]
+
+
 def _rendered_svg(root: Path, spec_id: str, kind: str) -> Path | None:
     """Locate a diagram's rendered SVG, which lives under out/<format>/.
 
@@ -74,16 +85,11 @@ def _rendered_svg(root: Path, spec_id: str, kind: str) -> Path | None:
     and then to any format present, so lint still inspects the render after a
     format change.
     """
-    manifest_path = root / "diagrams.yaml"
-    candidates: list[str] = []
-    if manifest_path.exists():
-        entry = next(
-            (d for d in load_manifest(manifest_path).diagrams if d.id == spec_id), None
+    candidates = list(
+        dict.fromkeys(
+            [*_recorded_formats(root, spec_id), DEFAULT_FORMAT[kind], *DEFAULT_FORMAT.values()]
         )
-        if entry is not None:
-            candidates.append(entry.format)
-    candidates.append(DEFAULT_FORMAT[kind])
-    candidates = list(dict.fromkeys([*candidates, *DEFAULT_FORMAT.values()]))
+    )
 
     for fmt in candidates:
         svg = root / "out" / fmt / f"{spec_id}.svg"
@@ -95,8 +101,20 @@ def _rendered_svg(root: Path, spec_id: str, kind: str) -> Path | None:
 def _cmd_lint(args: argparse.Namespace) -> int:
     root = Path(args.root)
     spec = load_spec(root / "src" / f"{args.id}.spec.yaml")
-    placements = Deps.default().layout(spec) if spec.nodes else {}
-    findings = lint_diagram(spec, placements, _rendered_svg(root, args.id, spec.kind))
+    svg = _rendered_svg(root, args.id, spec.kind)
+    # The render's own directory names its format (out/<format>/), which beats
+    # guessing when a diagram exists in several formats at once.
+    fmt = svg.parent.name if svg is not None else DEFAULT_FORMAT[spec.kind]
+
+    # Only lint placement geometry for formats that actually emit it; for
+    # mermaid the layout is recomputed by the renderer, so check_svg_bounds
+    # over the real SVG is the only meaningful geometry check.
+    placements: dict = {}
+    if spec.nodes and fmt in GEOMETRY_FORMATS:
+        deps = Deps.default()
+        placements = {**deps.layout(spec), **deps.layout_groups(spec)}
+
+    findings = lint_diagram(spec, placements, svg)
     if not findings:
         print(f"{args.id}: clean")
         return 0
@@ -137,7 +155,6 @@ def main(argv: list[str] | None = None) -> int:
     new = subparsers.add_parser("new", help="Scaffold a diagram spec")
     new.add_argument("id")
     new.add_argument("--kind", required=True, choices=sorted(DEFAULT_FORMAT))
-    new.add_argument("--format", choices=["mermaid", "drawio", "excalidraw"])
     add_root(new)
     new.set_defaults(func=_cmd_new)
 

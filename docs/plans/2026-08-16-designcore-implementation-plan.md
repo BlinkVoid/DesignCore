@@ -213,6 +213,29 @@ following amendments are **binding** and supersede the named task steps below.
   This is the strongest argument yet for that step: the XML was right, the SVG contained the
   edge paths, the lint was clean, and the diagram was still wrong.
 
+## Execution amendments (2026-08-17, post-review)
+
+Applied after a code review of `66f7ef7..1e91bb2`. Most findings were straightforward fixes;
+these three changed a design decision and are recorded here.
+
+- **A16 (amends Task 13's lint):** `check_geometry` runs only for formats that emit the
+  Graphviz placements — drawio and excalidraw (`pipeline.GEOMETRY_FORMATS`). Mermaid recomputes
+  its own layout at render time, so linting placements against a mermaid diagram reported on
+  geometry no output file uses. Group boxes are now included in the overlap check as well,
+  since a container that overlaps its neighbour is as unreadable as an overlapping node.
+
+- **A17 (amends Task 13's CLI):** `designcore new` no longer accepts `--format`. A spec is
+  format-agnostic by design and no manifest entry exists at scaffold time, so there was
+  nowhere to record the choice: `new --format mermaid` printed a promise that the following
+  `render` silently ignored. `render --format` is unaffected and is where the override belongs.
+
+- **A18 (amends Task 12's manifest, completing A13):** entries are keyed by **(id, format)**,
+  not id alone. A13 gave each format its own `out/` directory so renders coexist, but a
+  manifest keyed by id could only ever record one of them — the second render dropped the
+  first entry and orphaned its files. `check` also gained `ORPHANED_ARTIFACT`, a warning for
+  files under `src/` and `out/` that no entry references. It reports and never deletes:
+  removing a file a document may still link to is the author's decision.
+
 ---
 
 ### Task 1: Repository scaffold and `designcore doctor`

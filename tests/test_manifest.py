@@ -108,3 +108,42 @@ def test_check_flags_a_missing_spec(tmp_path):
     root = _tree(tmp_path, _entry())
     (root / "src" / "system-context.spec.yaml").unlink()
     assert [f.code for f in check_manifest(root)] == ["MISSING_SPEC"]
+
+
+def test_check_flags_artifacts_no_entry_references(tmp_path):
+    """Re-rendering under a different format leaves the previous source and
+    renders on disk, unreferenced. check could not see them, so a doc still
+    embedding the old path kept showing a stale picture."""
+    root = _tree(tmp_path, _entry())
+    (root / "src" / "system-context.mmd").write_text("flowchart LR\n", encoding="utf-8")
+    (root / "out" / "system-context.png").write_text("stale", encoding="utf-8")
+    findings = check_manifest(root)
+    assert [f.code for f in findings] == ["ORPHANED_ARTIFACT", "ORPHANED_ARTIFACT"]
+    assert all(f.severity == "warning" for f in findings)
+    assert {f.subject for f in findings} == {
+        "src/system-context.mmd",
+        "out/system-context.png",
+    }
+
+
+def test_check_ignores_the_manifest_and_referenced_files(tmp_path):
+    assert check_manifest(_tree(tmp_path, _entry())) == []
+
+
+def test_upsert_keys_on_id_and_format():
+    """Amendment A13 gave each format its own out/ directory so renders coexist;
+    the manifest has to describe that, or rendering a second format silently
+    drops the first entry and orphans its files."""
+    manifest = Manifest(version=1, diagrams=[_entry(format="drawio")])
+    updated = upsert(manifest, _entry(format="mermaid", source="src/system-context.mmd"))
+    assert [(d.id, d.format) for d in updated.diagrams] == [
+        ("system-context", "drawio"),
+        ("system-context", "mermaid"),
+    ]
+
+
+def test_upsert_still_replaces_the_same_id_and_format():
+    manifest = Manifest(version=1, diagrams=[_entry(format="drawio")])
+    updated = upsert(manifest, _entry(format="drawio", title="Renamed"))
+    assert len(updated.diagrams) == 1
+    assert updated.diagrams[0].title == "Renamed"

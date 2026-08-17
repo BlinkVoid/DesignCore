@@ -93,3 +93,23 @@ def test_formats_render_into_separate_directories(tmp_path):
     assert set(mermaid.rendered).isdisjoint(drawio.rendered)
     assert all((tmp_path / r).exists() for r in mermaid.rendered)
     assert all((tmp_path / r).exists() for r in drawio.rendered)
+
+
+def test_lint_skips_placement_geometry_when_the_format_does_not_use_it():
+    """Mermaid computes its own layout, so linting Graphviz placements reports
+    on geometry no output file uses. Passing none is the honest signal."""
+    from designcore.pipeline import GEOMETRY_FORMATS
+
+    assert "mermaid" not in GEOMETRY_FORMATS
+    assert {"drawio", "excalidraw"} <= GEOMETRY_FORMATS
+
+
+def test_lint_includes_group_boxes_in_the_overlap_check():
+    """Group boxes are emitted geometry too; overlapping containers are just
+    as unreadable as overlapping nodes."""
+    overlapping = {
+        "a": Placement("a", 0, 0, 100, 50),
+        "g": Placement("g", 10, 10, 100, 50),
+    }
+    codes = {f.code for f in lint_diagram(SPEC, overlapping, None)}
+    assert "NODE_OVERLAP" in codes

@@ -1,12 +1,13 @@
 from pathlib import Path
 
+import pytest
 import yaml
 
 from designcore.cli import main
 
 
 def test_new_scaffolds_a_spec_with_the_question_prompt(tmp_path, capsys):
-    code = main(["new", "request-flow", "--kind", "flow", "--root", str(tmp_path), "--format", "mermaid"])
+    code = main(["new", "request-flow", "--kind", "flow", "--root", str(tmp_path)])
     assert code == 0
     spec_file = tmp_path / "src" / "request-flow.spec.yaml"
     data = yaml.safe_load(spec_file.read_text(encoding="utf-8"))
@@ -108,3 +109,16 @@ def test_malformed_spec_is_reported_not_raised(tmp_path, capsys):
                                     "question": "Q?"}), encoding="utf-8")
     assert main(["lint", "d", "--root", str(tmp_path)]) == 1
     assert "nonsense" in capsys.readouterr().out
+
+
+def test_new_does_not_accept_a_format_it_cannot_honour(tmp_path):
+    """`new` has nowhere to persist a format choice -- the spec is deliberately
+    format-agnostic and no manifest entry exists yet -- so accepting --format
+    printed a promise that the subsequent render silently ignored."""
+    with pytest.raises(SystemExit):
+        main(["new", "d", "--kind", "concept", "--format", "mermaid", "--root", str(tmp_path)])
+
+
+def test_new_reports_the_format_render_will_actually_use(tmp_path, capsys):
+    assert main(["new", "d", "--kind", "concept", "--root", str(tmp_path)]) == 0
+    assert "excalidraw" in capsys.readouterr().out

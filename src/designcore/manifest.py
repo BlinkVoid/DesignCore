@@ -58,9 +58,16 @@ def save_manifest(manifest: Manifest, path: Path) -> None:
 
 
 def upsert(manifest: Manifest, entry: DiagramEntry) -> Manifest:
+    """Insert or replace an entry, keyed by (id, format).
+
+    Not by id alone: amendment A13 gave each format its own `out/` directory
+    so a diagram can exist in several formats at once, and a manifest keyed
+    only by id would drop the previous entry and orphan its files on the
+    second render.
+    """
     diagrams = list(manifest.diagrams)
     for index, existing in enumerate(diagrams):
-        if existing.id == entry.id:
+        if (existing.id, existing.format) == (entry.id, entry.format):
             diagrams[index] = entry
             return replace(manifest, diagrams=diagrams)
     diagrams.append(entry)
@@ -117,4 +124,41 @@ def check_manifest(root: Path) -> list[Finding]:
                     Finding("BROKEN_EMBED", "warning", f"embed target {embed} is missing", entry.id)
                 )
 
+    findings.extend(_orphaned_artifacts(root, manifest))
+    return findings
+
+
+def _orphaned_artifacts(root: Path, manifest: Manifest) -> list[Finding]:
+    """Flag files under src/ and out/ that no entry references.
+
+    Re-rendering a diagram in a different format leaves the previous source
+    and renders behind. Nothing points at them, so a document still embedding
+    the old path keeps showing a stale picture that `check` cannot see.
+    Reported, never deleted -- removing a file a reader may still link to is
+    the author's call.
+    """
+    referenced = {
+        (root / path).resolve()
+        for entry in manifest.diagrams
+        for path in (entry.spec, entry.source, *entry.rendered)
+    }
+
+    findings: list[Finding] = []
+    for directory in ("src", "out"):
+        base = root / directory
+        if not base.is_dir():
+            continue
+        for found in sorted(base.rglob("*")):
+            if found.is_dir() or found.resolve() in referenced:
+                continue
+            relative = found.relative_to(root)
+            findings.append(
+                Finding(
+                    "ORPHANED_ARTIFACT",
+                    "warning",
+                    f"{relative} is not referenced by any diagram entry; "
+                    "left over from a previous format or a deleted diagram",
+                    str(relative),
+                )
+            )
     return findings

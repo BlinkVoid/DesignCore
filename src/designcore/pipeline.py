@@ -24,6 +24,11 @@ from designcore.spec import DiagramSpec
 
 SUFFIXES = {"mermaid": ".mmd", "drawio": ".drawio", "excalidraw": ".excalidraw"}
 
+# Formats whose output files carry the Graphviz placements verbatim. Mermaid
+# is absent on purpose: it runs its own layout at render time, so checking
+# placements against a mermaid diagram lints geometry no output file uses.
+GEOMETRY_FORMATS = frozenset({"drawio", "excalidraw"})
+
 
 @dataclass(frozen=True)
 class Deps:
