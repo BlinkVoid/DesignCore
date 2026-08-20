@@ -31,7 +31,8 @@ def _quote(value: str) -> str:
     mermaid emitter happily escapes would otherwise reach dot unescaped and
     fail the whole layout with a syntax error.
     """
-    return value.replace("\\", "\\\\").replace('"', '\\"')
+    value = value.replace("\\", "\\\\").replace('"', '\\"')
+    return value.replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n")
 
 
 def to_dot(spec: DiagramSpec) -> str:

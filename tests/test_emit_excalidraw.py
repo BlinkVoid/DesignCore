@@ -37,6 +37,17 @@ def test_each_node_gets_a_bound_text_label():
     assert {t["text"] for t in texts} >= {"Alpha", "Beta"}
 
 
+def test_multiline_node_label_uses_box_inset_geometry():
+    spec = DiagramSpec(
+        id="d", title="T", kind="concept", question="Q?",
+        nodes=(Node(id="a", label="Service\nWorker"),),
+    )
+    elements = emit_excalidraw(spec, {"a": Placement("a", 10.0, 20.0, 120.0, 80.0)})["elements"]
+    label = next(e for e in elements if e.get("id") == "a-label")
+
+    assert (label["x"], label["y"], label["width"], label["height"]) == (18.0, 28.0, 104.0, 64.0)
+
+
 def test_each_edge_becomes_an_arrow_between_the_right_elements():
     elements = emit_excalidraw(SPEC, PLACEMENTS)["elements"]
     arrows = [e for e in elements if e["type"] == "arrow"]

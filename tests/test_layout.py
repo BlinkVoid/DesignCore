@@ -38,6 +38,15 @@ def test_dot_source_declares_nodes_edges_and_cluster():
     assert "subgraph cluster_g" in dot
 
 
+def test_multiline_node_labels_get_escaped_newlines_for_dot():
+    spec = DiagramSpec(
+        id="d", title="T", kind="flow", question="Q?", direction="TB",
+        nodes=(Node(id="a", label="Service\nWorker"),),
+        edges=(),
+    )
+    assert 'label="Service\\nWorker"' in to_dot(spec)
+
+
 def test_layout_returns_top_left_pixel_placements():
     placements = layout_spec(SPEC, run=_ok, which=lambda c: "/usr/bin/dot")
     assert set(placements) == {"a", "b"}

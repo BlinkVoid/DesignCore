@@ -163,7 +163,8 @@ def emit_excalidraw(
         rect["boundElements"] = [{"type": "text", "id": f"{node.id}-label"}]
         elements.append(rect)
 
-        label = _base(f"{node.id}-label", box.x + 8, box.y + box.height / 2 - 10, box.width - 16, 20)
+        label_height = box.height - 16
+        label = _base(f"{node.id}-label", box.x + 8, box.y + 8, box.width - 16, label_height)
         label["type"] = "text"
         label["text"] = node.label
         label["originalText"] = node.label
