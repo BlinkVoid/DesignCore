@@ -1,6 +1,7 @@
 # ✎ DesignCore
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/designcore.svg)](https://pypi.org/project/designcore/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![CI](https://github.com/BlinkVoid/DesignCore/actions/workflows/tests.yml/badge.svg)](https://github.com/BlinkVoid/DesignCore/actions/workflows/tests.yml)
 
@@ -44,8 +45,11 @@ package.*
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# As an installable CLI tool (from GitHub today; PyPI pending)
-uv tool install git+https://github.com/BlinkVoid/DesignCore.git
+# As an installable CLI tool
+uv tool install designcore
+
+# Or with pip
+pip install designcore
 
 # Or from a clone, for development
 git clone https://github.com/BlinkVoid/DesignCore.git && cd DesignCore
