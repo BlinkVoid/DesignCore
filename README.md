@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
+> 🌐 [Project website](https://blinkvoid.github.io/DesignCore/)
+
 DesignCore turns a coordinate-free graph spec into a verified diagram — draw.io,
 Mermaid, or Excalidraw — where the model never places a shape and nothing counts
 as finished until it has actually rendered. It ships three agent skills
