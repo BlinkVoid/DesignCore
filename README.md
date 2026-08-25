@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
+> 🌐 [Project website](https://blinkvoid.github.io/DesignCore/)
+
 > **Verified diagrams for documentation** — draw.io, Mermaid, or Excalidraw,
 > from a spec your AI agent can actually be trusted to write.
 
