@@ -47,6 +47,22 @@ npm install --prefix src/designcore/render/js
 > pass `doctor` and still fail — install-time and render-time are different
 > questions.
 
+### Platform notes
+
+Verified on Linux. Portability caveats worth knowing before you rely on a
+backend (full detail in
+[docs/plans/2026-08-16-render-backend-findings.md](docs/plans/2026-08-16-render-backend-findings.md)):
+
+| backend | caveat |
+|---|---|
+| `dot` (graphviz) | No sudo? Graphviz installs fine via `apt-get download` + `dpkg -x` into `~/.local` with a `GVBINDIR` wrapper — no root needed |
+| `drawio` (snap) | Strict snap confinement: exports must run with input/output under `$HOME`, never `/tmp`; the snap wrapper already injects `--no-sandbox`. Headless export goes through `xvfb-run -a` when no `DISPLAY` is set |
+| `mmdc` | Bundled Chromium may fail to start under AppArmor's userns restriction; the renderer prefers a system browser via puppeteer config and only falls back to `--no-sandbox` when no system browser exists |
+| Excalidraw helper | Needs one `npm install --prefix src/designcore/render/js`; jsdom shims load before `@excalidraw/utils` |
+
+macOS/Windows are untested for 0.1; the spec/lint layers are pure Python and
+portable, the risk sits entirely in the external backends.
+
 ## Commands
 
 | command | does |
