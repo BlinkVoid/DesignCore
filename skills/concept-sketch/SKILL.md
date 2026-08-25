@@ -29,10 +29,11 @@ Format mechanics: [../_shared/references/excalidraw.md](../_shared/references/ex
 
 ## Render status
 
-Excalidraw sketches **are** visually verified. The renderer runs a Node helper shipped with
+Excalidraw sketches are **render-verified**: the renderer runs a Node helper shipped with
 DesignCore (jsdom shim plus `@excalidraw/utils`), then rasterizes to PNG with headless Chrome,
-so step 4 of the pipeline judges a real picture. Status and history:
-`docs/plans/2026-08-16-render-backend-findings.md` section 3.
+so step 4 of the pipeline judges a real picture. The render proves the picture exists and is
+inspectable — whether it *reads* well stays a human judgment, same as every format. Status
+and history: `docs/plans/2026-08-16-render-backend-findings.md` section 3.
 
 Two expected conditions, neither a failure:
 
