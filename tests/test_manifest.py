@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import hashlib
 import pytest
 
 from designcore.manifest import (
@@ -108,6 +109,67 @@ def test_check_flags_a_missing_spec(tmp_path):
     root = _tree(tmp_path, _entry())
     (root / "src" / "system-context.spec.yaml").unlink()
     assert [f.code for f in check_manifest(root)] == ["MISSING_SPEC"]
+
+
+def test_check_with_fingerprints_is_content_not_time_based(tmp_path):
+    """git does not preserve mtimes: on a fresh clone every file shares the
+    checkout time, in arbitrary order. When a manifest records fingerprints,
+    staleness must be decided by content alone — a consistent tree is clean
+    no matter what order checkout wrote the files."""
+    entry = _entry(
+        source_sha256=hashlib.sha256(b"<mxfile/>").hexdigest(),
+        spec_sha256=hashlib.sha256(b"id: x\n").hexdigest(),
+    )
+    root = _tree(tmp_path, entry)
+    import os
+
+    os.utime(root / "out" / "system-context.svg", (1, 1))  # older than everything
+    assert check_manifest(root) == []
+
+
+def test_check_flags_a_source_that_drifts_from_its_fingerprint(tmp_path):
+    entry = _entry(source_sha256="0" * 64)
+    root = _tree(tmp_path, entry)
+    findings = check_manifest(root)
+    assert [f.code for f in findings] == ["STALE_RENDER"]
+    assert "fingerprint" in findings[0].message
+
+
+def test_check_flags_a_spec_that_drifts_from_its_fingerprint(tmp_path):
+    entry = _entry(spec_sha256="0" * 64)
+    root = _tree(tmp_path, entry)
+    assert [f.code for f in check_manifest(root)] == ["STALE_RENDER"]
+
+
+def test_compile_diagram_records_fingerprints(tmp_path):
+    from designcore.pipeline import Deps, compile_diagram
+    from designcore.spec import load_spec
+
+    spec_text = (
+        "id: fp-demo\ntitle: Fp\nkind: context\nquestion: q?\n"
+        "nodes:\n  - id: a\n    label: A\n"
+    )
+    (tmp_path / "src").mkdir()
+    spec_file = tmp_path / "src" / "fp-demo.spec.yaml"
+    spec_file.write_text(spec_text, encoding="utf-8")
+    spec = load_spec(spec_file)
+
+    def fake_render(src: Path, out: Path) -> list[Path]:
+        out.mkdir(parents=True, exist_ok=True)
+        target = out / (src.stem + ".svg")
+        target.write_text("<svg/>", encoding="utf-8")
+        return [target]
+
+    deps = Deps(
+        render_map={"mermaid": fake_render},
+        layout=lambda spec: {},
+        layout_groups=lambda spec: {},
+    )
+    entry = compile_diagram(spec, "mermaid", tmp_path, deps)
+    assert entry.source_sha256 == hashlib.sha256(
+        (tmp_path / "src" / "fp-demo.mmd").read_bytes()
+    ).hexdigest()
+    assert entry.spec_sha256 == hashlib.sha256(spec_text.encode("utf-8")).hexdigest()
 
 
 def test_check_flags_artifacts_no_entry_references(tmp_path):

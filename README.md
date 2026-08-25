@@ -1,14 +1,29 @@
 # DesignCore
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 DesignCore turns a coordinate-free graph spec into a verified diagram — draw.io,
 Mermaid, or Excalidraw — where the model never places a shape and nothing counts
 as finished until it has actually rendered. It ships three agent skills
 (`architecture-diagram`, `flow-diagram`, `concept-sketch`) that carry the
 judgment layer on top.
 
+> **What "verified" means here:** the spec compiled, every backend rendered
+> successfully, and deterministic structural/density/geometry checks passed.
+> It does **not** mean the diagram is visually correct or that it communicates
+> well — judgment about content stays with you.
+
 ## Install
 
+Requires [uv](https://docs.astral.sh/uv/).
+
 ```bash
+# As an installable CLI tool
+uv tool install git+https://github.com/BlinkVoid/DesignCore.git
+
+# Or from a clone, for development
+git clone https://github.com/BlinkVoid/DesignCore.git && cd DesignCore
 uv sync
 uv run designcore doctor
 ```

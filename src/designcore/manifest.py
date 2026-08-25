@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date
 from pathlib import Path
@@ -9,6 +10,10 @@ from pathlib import Path
 import yaml
 
 from designcore.lint import Finding
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -25,6 +30,11 @@ class DiagramEntry:
     hand_owned: bool = False
     generated_by: str = "designcore"
     generated_at: str = field(default_factory=lambda: date.today().isoformat())
+    # Content fingerprints of the inputs a render consumed. git does not
+    # preserve mtimes, so staleness on a fresh clone is only decidable from
+    # content; entries without fingerprints fall back to the mtime comparison.
+    source_sha256: str = ""
+    spec_sha256: str = ""
 
     def __post_init__(self) -> None:
         if not self.question.strip():
@@ -108,12 +118,11 @@ def check_manifest(root: Path) -> list[Finding]:
             )
             continue
 
-        # Measured against the spec as well as the emitted source: editing a
-        # spec without re-rendering leaves the source untouched, so comparing
-        # only against it reports "clean" for exactly the drift that matters.
-        authored = max(
-            [source.stat().st_mtime] + ([spec.stat().st_mtime] if spec.exists() else [])
-        )
+        # Staleness is content-first: if the render recorded fingerprints of
+        # its inputs, drift is a hash mismatch — decidable on a fresh clone,
+        # where git has flattened every mtime to checkout time. Entries
+        # written before fingerprints existed fall back to comparing mtimes.
+        fingerprinted = bool(entry.source_sha256 or entry.spec_sha256)
 
         for rendered in entry.rendered:
             target = root / rendered
@@ -121,16 +130,38 @@ def check_manifest(root: Path) -> list[Finding]:
                 findings.append(
                     Finding("MISSING_RENDER", "error", f"render {rendered} is missing", entry.id)
                 )
-            elif target.stat().st_mtime < authored:
+            elif fingerprinted and (
+                (entry.source_sha256 and _sha256(source) != entry.source_sha256)
+                or (
+                    entry.spec_sha256
+                    and spec.exists()
+                    and _sha256(spec) != entry.spec_sha256
+                )
+            ):
                 findings.append(
                     Finding(
                         "STALE_RENDER",
                         "warning",
-                        f"{rendered} is older than its spec or source; "
-                        "re-run designcore render",
+                        f"{rendered} differs from the render's recorded input "
+                        "fingerprints; re-run designcore render",
                         entry.id,
                     )
                 )
+            elif not fingerprinted:
+                # Measured against the spec as well as the emitted source: editing a
+                # spec without re-rendering leaves the source untouched, so comparing
+                # only against it reports "clean" for exactly the drift that matters.
+                authored = max([source.stat().st_mtime] + ([spec.stat().st_mtime] if spec.exists() else []))
+                if target.stat().st_mtime < authored:
+                    findings.append(
+                        Finding(
+                            "STALE_RENDER",
+                            "warning",
+                            f"{rendered} is older than its spec or source; "
+                            "re-run designcore render",
+                            entry.id,
+                        )
+                    )
 
         for embed in entry.embedded_in:
             if not (root / embed).exists():

@@ -13,4 +13,6 @@ diagrams:
   embedded_in: []
   hand_owned: false
   generated_by: designcore
-  generated_at: '2026-08-17'
+  generated_at: '2026-08-25'
+  source_sha256: bb0b11abed5dd7d373e120fce605531714a0514e2938c317bc4765cde87af8a3
+  spec_sha256: bc6938ba5e38dedd8d613743521737225d1e83b54fba6c9b7bda38b45eb59858

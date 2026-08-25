@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from functools import lru_cache
@@ -97,13 +98,15 @@ def compile_diagram(
         )
 
     source_path.parent.mkdir(parents=True, exist_ok=True)
-    source_path.write_text(_source_text(spec, fmt, deps), encoding="utf-8")
+    source_text = _source_text(spec, fmt, deps)
+    source_path.write_text(source_text, encoding="utf-8")
 
     # Per-format output directory: every renderer names its output from the
     # source stem, which is the diagram id in all three formats, so a shared
     # out/ makes the second render silently clobber the first.
     rendered = deps.render_map[fmt](source_path, out_root / "out" / fmt)
 
+    spec_path = out_root / "src" / (spec.id + ".spec.yaml")
     return DiagramEntry(
         id=spec.id,
         title=spec.title,
@@ -114,6 +117,12 @@ def compile_diagram(
         source=str(source_path.relative_to(out_root)),
         rendered=[str(p.relative_to(out_root)) for p in rendered],
         hand_owned=hand_owned,
+        source_sha256=hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
+        spec_sha256=(
+            hashlib.sha256(spec_path.read_bytes()).hexdigest()
+            if spec_path.exists()
+            else ""
+        ),
     )
 
 
