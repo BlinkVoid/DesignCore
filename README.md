@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![CI](https://github.com/BlinkVoid/DesignCore/actions/workflows/tests.yml/badge.svg)](https://github.com/BlinkVoid/DesignCore/actions/workflows/tests.yml)
 
 > 🌐 [Project website](https://blinkvoid.github.io/DesignCore/)
 
@@ -43,7 +44,7 @@ package.*
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# As an installable CLI tool
+# As an installable CLI tool (from GitHub today; PyPI pending)
 uv tool install git+https://github.com/BlinkVoid/DesignCore.git
 
 # Or from a clone, for development
